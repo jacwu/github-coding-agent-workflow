@@ -92,6 +92,25 @@ Radius tokens (`--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-xl`) are d
 | `npm run build` | ✅ Production build succeeds, static pages generated |
 | HTML output verification | ✅ Correct CSS classes applied (Ocean Teal colors, rounded-3xl, shadow-sm, Button variants) |
 
+## Revision Notes (2026-03-21)
+
+### Revisions
+- Updated `src/components/ui/Button.tsx` so the seed shadcn Button uses the large radius theme (`rounded-lg`) instead of hard-coded smaller radii, aligning the component with the rounded-2xl/3xl visual direction established by Task 1.
+- Added a reusable `.glass` utility to `src/app/globals.css` to establish the frosted-glass styling base called for in the design documents for future navbar and image overlay work.
+- Added the missing `src/types/index.ts` placeholder so the scaffold now matches the `src/types/` project structure described in `docs/design.md`.
+
+### Affected Files
+- `travel-website/src/components/ui/Button.tsx`
+- `travel-website/src/app/globals.css`
+- `travel-website/src/types/index.ts`
+
+### Validation
+- `cd travel-website && npm run lint` ✅
+- `cd travel-website && npm run build` ✅
+
+### Remaining Items
+- No additional Task 1 revisions identified during this review.
+
 ## Dependencies Added
 - `class-variance-authority` ^0.7.1
 - `clsx` ^2.1.1
@@ -99,6 +118,9 @@ Radius tokens (`--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-xl`) are d
 - `lucide-react` ^0.577.0
 - `@radix-ui/react-slot` ^1.2.4
 - `geist` (local font package)
+
+## Version Notes
+- The current scaffold is running on Next.js `16.2.1` with React `19.2.4`, which is the version installed in `travel-website/package.json`.
 
 ## Open Items
 - None. All 10 implementation plan steps from task.md have been completed and validated.
