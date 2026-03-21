@@ -1,0 +1,82 @@
+name: stage-router
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  stage-router:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      REPO: ${{ github.repository }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Resolve linked issue number
+        id: resolve_issue
+        run: |
+          issue_json=$(python scripts/get_issue_number_from_pr.py "$PR_NUMBER" --repo "$REPO" --json)
+          issue_number=$(python -c "import json,sys; data=json.loads(sys.argv[1]); print(data['issue_numbers'][0] if data['issue_numbers'] else '')" "$issue_json")
+          issue_source=$(python -c "import json,sys; data=json.loads(sys.argv[1]); print(data['source'])" "$issue_json")
+
+          echo "Issue source: $issue_source"
+
+          if [ -z "$issue_number" ]; then
+            echo "No linked issue found for PR #$PR_NUMBER"
+            echo "issue_number=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Resolved issue number: $issue_number"
+          echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
+
+      - name: Determine next stage
+        id: route
+        if: steps.resolve_issue.outputs.issue_number != ''
+        run: |
+          issue_number="${{ steps.resolve_issue.outputs.issue_number }}"
+          labels=$(python scripts/get_issue_labels.py "$issue_number" --repo "$REPO")
+          echo "Current labels: $labels"
+
+          has_label() { echo "$labels" | grep -Fx "$1" > /dev/null 2>&1; }
+
+          next_label=""
+
+          if has_label "ai-design" && ! has_label "ai-design-revise"; then
+            next_label="ai-design-revise"
+          elif has_label "ai-design-revise" && ! has_label "ai-implement"; then
+            next_label="ai-implement"
+          elif has_label "ai-implement" && ! has_label "ai-implement-revise"; then
+            next_label="ai-implement-revise"
+          fi
+
+          if [ -n "$next_label" ]; then
+            echo "Next stage: $next_label"
+            echo "next_label=$next_label" >> "$GITHUB_OUTPUT"
+          else
+            echo "No next stage to advance to"
+            echo "next_label=" >> "$GITHUB_OUTPUT"
+          fi
+      
+      - name: Add next stage label
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_ACTION_TOKEN }}
+        if: steps.route.outputs.next_label != ''
+        run: |
+          python scripts/add_label_to_issue.py "${{ steps.resolve_issue.outputs.issue_number }}" "${{ steps.route.outputs.next_label }}" --repo "$REPO"

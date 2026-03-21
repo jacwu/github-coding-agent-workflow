@@ -1,0 +1,70 @@
+name: ai-design-revise
+
+on:
+  issues:
+    types:
+      - labeled
+
+jobs:
+  ai-design-revise:
+    if: github.event.label.name == 'ai-design-revise'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      REPO: ${{ github.repository }}
+      BRANCH_NAME: feature/${{ github.event.issue.number }}
+      CUSTOM_AGENT: ai-design-revise
+      CUSTOM_INSTRUCTIONS: You are in the design revision phase. The issue number is ${{ github.event.issue.number }}. Read and review the existing docs/tasks/<issue-number>/task.md, revise the technical design document based on the current codebase state. Only modify docs/tasks/<issue-number>/task.md — do not implement any code. Stop immediately after revision is complete.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Print issue context
+        run: |
+          echo "Workflow: ai-design-revise"
+          echo "Action: ${{ github.event.action }}"
+          echo "Issue number: $ISSUE_NUMBER"
+          echo "Issue title: ${{ github.event.issue.title }}"
+          echo "Added label: ${{ github.event.label.name }}"
+          echo "Issue URL: ${{ github.event.issue.html_url }}"
+
+      - name: Remove Copilot from issue
+        run: |
+          python scripts/remove_copilot_from_issue.py "$ISSUE_NUMBER" --repo "$REPO"
+
+      - name: Assign issue to Copilot
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_ACTION_TOKEN }}
+        run: |
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "COPILOT_ACTION_TOKEN secret is required for Copilot issue assignment" >&2
+            exit 1
+          fi
+          python scripts/assign_to_copilot.py "$ISSUE_NUMBER" \
+            --repo "$REPO" \
+            --branch "$BRANCH_NAME" \
+            --instructions "$CUSTOM_INSTRUCTIONS" \
+            --custom-agent "$CUSTOM_AGENT" \
+            --model "claude-opus-4.6"
+
+      - name: Comment issue start
+        env:
+          COMMENT_BODY: |
+            🔄 **Stage: Design Revision** has started!
+
+            📋 Copilot is reviewing and revising the technical design document.
+
+            🤖 Model : claude-opus-4.6
+        run: |
+          python scripts/comment_on_issue.py "$ISSUE_NUMBER" "$COMMENT_BODY" --repo "$REPO"

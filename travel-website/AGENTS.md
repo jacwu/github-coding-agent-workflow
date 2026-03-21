@@ -1,0 +1,1 @@
+## This is a sample application to demonstrate how to use GitHub cloud coding agent to automate issue development on GitHub. The sample app is a trip planner app, and the sample issues are in the `docs/tasks.md` file. 
