@@ -1,5 +1,4 @@
 import "next-auth";
-import "next-auth/jwt";
 import "@auth/core/jwt";
 
 declare module "next-auth" {
@@ -14,12 +13,6 @@ declare module "next-auth" {
 }
 
 declare module "@auth/core/jwt" {
-  interface JWT {
-    id?: string;
-  }
-}
-
-declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
   }
