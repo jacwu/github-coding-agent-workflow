@@ -38,3 +38,27 @@
 ## Open Items
 
 None — all items from the task document are complete.
+
+## Revision Update
+
+### Review Conclusion
+- The original Task 4 implementation already covered the required auth foundation, so this revision focused on targeted hardening and design-alignment rather than feature expansion.
+
+### Targeted Revisions
+- Hardened `src/app/api/auth/register/route.ts` so a duplicate-email unique-constraint failure during insert is returned as `409 { "error": "Email already registered" }` instead of falling through to a generic `500`. This closes the race-condition gap between the duplicate pre-check and the actual insert.
+- Updated `src/types/next-auth.d.ts` to augment `next-auth/jwt` and to compose `Session.user` with `DefaultSession["user"]`, matching the Task 4 design document more closely for future typed auth usage.
+- Added a focused regression test in `src/app/api/auth/register/route.test.ts` covering the insert-time duplicate-email path.
+
+### Affected Files
+- `travel-website/src/app/api/auth/register/route.ts`
+- `travel-website/src/app/api/auth/register/route.test.ts`
+- `travel-website/src/types/next-auth.d.ts`
+
+### Revision Validation
+- `npm test -- src/app/api/auth/register/route.test.ts` ✅
+- `npm run lint` ✅
+- `AUTH_SECRET=test-secret npm run build` ✅
+- `npm test` ✅ (48 tests passed)
+
+### Remaining Items
+- None.
