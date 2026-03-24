@@ -44,6 +44,46 @@ function makeRequest(body: unknown): Request {
   });
 }
 
+function createDuplicateInsertDbMock(): ReturnType<typeof drizzle> {
+  return {
+    select() {
+      return {
+        from() {
+          return {
+            where() {
+              return {
+                get() {
+                  return undefined;
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+    insert() {
+      return {
+        values() {
+          return {
+            returning() {
+              return {
+                get() {
+                  throw Object.assign(
+                    new Error("UNIQUE constraint failed: users.email"),
+                    {
+                      code: "SQLITE_CONSTRAINT_UNIQUE",
+                    },
+                  );
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as ReturnType<typeof drizzle>;
+}
+
 describe("POST /api/auth/register", () => {
   beforeEach(() => {
     ({ db: testDb, sqlite: testSqlite } = createTestDb());
@@ -260,43 +300,7 @@ describe("POST /api/auth/register", () => {
   it("returns 409 when the insert hits a duplicate email constraint", async () => {
     const { POST } = await import("./route");
 
-    currentDb = {
-      select() {
-        return {
-          from() {
-            return {
-              where() {
-                return {
-                  get() {
-                    return undefined;
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
-      insert() {
-        return {
-          values() {
-            return {
-              returning() {
-                return {
-                  get() {
-                    throw Object.assign(
-                      new Error("UNIQUE constraint failed: users.email"),
-                      {
-                        code: "SQLITE_CONSTRAINT_UNIQUE",
-                      },
-                    );
-                  },
-                };
-              },
-            };
-          },
-        };
-      },
-    } as unknown as ReturnType<typeof drizzle>;
+    currentDb = createDuplicateInsertDbMock();
 
     const response = await POST(
       makeRequest({
