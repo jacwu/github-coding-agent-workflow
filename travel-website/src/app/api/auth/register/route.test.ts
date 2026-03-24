@@ -10,10 +10,11 @@ vi.mock("server-only", () => ({}));
 
 let testDb: ReturnType<typeof drizzle>;
 let testSqlite: InstanceType<typeof Database>;
+let currentDb: ReturnType<typeof drizzle>;
 
 vi.mock("@/db", () => ({
   get db() {
-    return testDb;
+    return currentDb;
   },
 }));
 
@@ -46,6 +47,7 @@ function makeRequest(body: unknown): Request {
 describe("POST /api/auth/register", () => {
   beforeEach(() => {
     ({ db: testDb, sqlite: testSqlite } = createTestDb());
+    currentDb = testDb;
   });
 
   afterEach(() => {
@@ -253,5 +255,59 @@ describe("POST /api/auth/register", () => {
     );
 
     expect(response.status).toBe(409);
+  });
+
+  it("returns 409 when the insert hits a duplicate email constraint", async () => {
+    const { POST } = await import("./route");
+
+    currentDb = {
+      select() {
+        return {
+          from() {
+            return {
+              where() {
+                return {
+                  get() {
+                    return undefined;
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      insert() {
+        return {
+          values() {
+            return {
+              returning() {
+                return {
+                  get() {
+                    throw Object.assign(
+                      new Error("UNIQUE constraint failed: users.email"),
+                      {
+                        code: "SQLITE_CONSTRAINT_UNIQUE",
+                      },
+                    );
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as ReturnType<typeof drizzle>;
+
+    const response = await POST(
+      makeRequest({
+        email: "race@example.com",
+        password: "password123",
+        name: "Race Condition",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error).toBe("Email already registered");
   });
 });

@@ -8,6 +8,20 @@ import { users } from "@/db/schema";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 
+function isDuplicateEmailError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : undefined;
+
+  return (
+    code === "SQLITE_CONSTRAINT_UNIQUE" &&
+    error.message.includes("users.email")
+  );
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     let body: unknown;
@@ -100,7 +114,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
       { status: 201 },
     );
-  } catch {
+  } catch (error: unknown) {
+    if (isDuplicateEmailError(error)) {
+      return NextResponse.json(
+        { error: "Email already registered" },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
