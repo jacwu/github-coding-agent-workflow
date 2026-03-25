@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import LoginForm from "@/components/auth/LoginForm";
 
+/** Accept only relative paths that cannot be abused as open redirects. */
+function isValidRelativeUrl(url: string): boolean {
+  return url.startsWith("/") && !url.startsWith("//") && !url.includes("://");
+}
+
 interface LoginPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -16,11 +21,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
 
   const rawCallback = typeof params.callbackUrl === "string" ? params.callbackUrl : undefined;
-
-  let callbackUrl: string | undefined;
-  if (rawCallback && rawCallback.startsWith("/") && !rawCallback.startsWith("//") && !rawCallback.includes("://")) {
-    callbackUrl = rawCallback;
-  }
+  const callbackUrl = rawCallback && isValidRelativeUrl(rawCallback) ? rawCallback : undefined;
 
   const registered = params.registered === "1";
 

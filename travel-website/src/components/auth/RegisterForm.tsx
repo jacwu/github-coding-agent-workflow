@@ -7,6 +7,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
+const GENERIC_ERROR = "Something went wrong. Please try again.";
+
 export default function RegisterForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -59,9 +61,9 @@ export default function RegisterForm() {
         return;
       }
 
-      setError("Something went wrong. Please try again.");
+      setError(GENERIC_ERROR);
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(GENERIC_ERROR);
     } finally {
       setIsPending(false);
     }
