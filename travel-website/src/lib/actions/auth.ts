@@ -7,11 +7,21 @@ export interface LoginActionState {
   error?: string;
 }
 
+function sanitizeRedirectTo(value: FormDataEntryValue | null): string {
+  if (typeof value !== "string") {
+    return "/";
+  }
+
+  return value.startsWith("/") && !value.startsWith("//") && !value.includes("://")
+    ? value
+    : "/";
+}
+
 export async function loginAction(
   _prevState: LoginActionState | undefined,
   formData: FormData
 ): Promise<LoginActionState> {
-  const redirectTo = (formData.get("redirectTo") as string) || "/";
+  const redirectTo = sanitizeRedirectTo(formData.get("redirectTo"));
 
   try {
     await signIn("credentials", {
