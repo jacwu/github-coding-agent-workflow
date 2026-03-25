@@ -47,3 +47,42 @@
 ## Open Items
 
 - End-to-end flow testing (register → login → authenticated navbar → logout) requires a running database with seed data — verified structurally but not as a full user flow in this session
+
+## Revision Update — 2026-03-25
+
+### Review Conclusion
+
+The existing Task 5 implementation was largely complete, but two targeted follow-up revisions were needed:
+
+1. **Server-side redirect hardening** — `src/app/login/page.tsx` validated `callbackUrl`, but `src/lib/actions/auth.ts` still trusted the submitted hidden `redirectTo` field. A crafted POST could therefore bypass the page-level check. The login server action now sanitizes `redirectTo` and falls back to `/` for external or protocol-relative values.
+2. **Mobile navbar visibility** — the navbar hid public links below the `sm` breakpoint, which conflicted with the task design calling for navigation links to remain readable on small screens. The navbar now wraps instead of hiding those links.
+
+### Affected Files
+
+| File | Revision |
+|---|---|
+| `travel-website/src/lib/actions/auth.ts` | Added server-side `redirectTo` sanitization before calling `signIn` |
+| `travel-website/src/lib/actions/auth.test.ts` | Added focused Vitest coverage for rejecting external and protocol-relative redirect targets |
+| `travel-website/src/components/Navbar.tsx` | Allowed mobile wrapping for nav/actions and added a display-name fallback |
+
+### Validation
+
+- Baseline before changes:
+  - `npm run lint` ✅
+  - `npm test` ✅ (53 passing)
+  - `AUTH_SECRET=test-secret npm run build` ✅
+- After revisions:
+  - `npm test -- src/lib/actions/auth.test.ts` ✅ (7 passing)
+  - `npm run lint -- src/lib/actions/auth.ts src/lib/actions/auth.test.ts src/components/Navbar.tsx` ✅
+  - `npm run lint` ✅
+  - `npm test` ✅ (55 passing)
+  - `AUTH_SECRET=test-secret npm run build` ✅
+- Manual verification:
+  - `/login` renders with unauthenticated navbar state
+  - Public navbar links remain visible on a narrow/mobile viewport
+  - Screenshot captured locally: `/tmp/playwright-logs/task5-login-mobile.png`
+  - User-provided screenshot URL suitable for review context: `https://github.com/user-attachments/assets/6d587958-cf22-413b-b432-30c057d98b7a`
+
+### Remaining Items
+
+- Full browser-level end-to-end verification of registration, login, authenticated navbar, and logout against a populated database remains out of scope for this revision pass.

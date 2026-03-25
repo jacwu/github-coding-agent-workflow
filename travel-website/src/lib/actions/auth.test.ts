@@ -78,6 +78,42 @@ describe("loginAction", () => {
     });
   });
 
+  it("falls back to '/' when redirectTo is an external URL", async () => {
+    mockSignIn.mockResolvedValue(undefined);
+
+    const fd = makeFormData({
+      email: "user@example.com",
+      password: "password123",
+      redirectTo: "https://evil.example/steal-session",
+    });
+
+    await loginAction(undefined, fd);
+
+    expect(mockSignIn).toHaveBeenCalledWith("credentials", {
+      email: "user@example.com",
+      password: "password123",
+      redirectTo: "/",
+    });
+  });
+
+  it("falls back to '/' when redirectTo starts with '//'", async () => {
+    mockSignIn.mockResolvedValue(undefined);
+
+    const fd = makeFormData({
+      email: "user@example.com",
+      password: "password123",
+      redirectTo: "//evil.example",
+    });
+
+    await loginAction(undefined, fd);
+
+    expect(mockSignIn).toHaveBeenCalledWith("credentials", {
+      email: "user@example.com",
+      password: "password123",
+      redirectTo: "/",
+    });
+  });
+
   it("returns an error state when signIn throws an AuthError", async () => {
     mockSignIn.mockRejectedValue(new MockAuthError("CredentialsSignin"));
 
