@@ -24,11 +24,11 @@ export async function GET(request: Request): Promise<NextResponse> {
     const orderBy = buildOrderBy(params.sort);
     const offset = (params.page - 1) * params.limit;
 
-    const [totalResult] = db
+    const totalResult = db
       .select({ count: count() })
       .from(destinations)
       .where(where)
-      .all();
+      .get();
 
     const total = totalResult?.count ?? 0;
 
