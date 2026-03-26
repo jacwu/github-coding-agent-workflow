@@ -240,9 +240,17 @@ describe("seedDestinations", () => {
   });
 
   it("inserts new destinations", async () => {
+    const baliImage = {
+      sourceUrl: "https://images.unsplash.com/photo-bali?w=800&q=80",
+      filename: "bali.jpg",
+    };
+    const kyotoImage = {
+      sourceUrl: "https://images.unsplash.com/photo-kyoto?w=800&q=80",
+      filename: "kyoto.jpg",
+    };
     const entries = [
-      makeEntry({ name: "Bali", image: { sourceUrl: "https://images.unsplash.com/photo-bali?w=800&q=80", filename: "bali.jpg" } }),
-      makeEntry({ name: "Kyoto", image: { sourceUrl: "https://images.unsplash.com/photo-kyoto?w=800&q=80", filename: "kyoto.jpg" } }),
+      makeEntry({ name: "Bali", image: baliImage }),
+      makeEntry({ name: "Kyoto", image: kyotoImage }),
     ];
 
     await seedDestinations(db, entries);
@@ -256,10 +264,15 @@ describe("seedDestinations", () => {
   });
 
   it("updates existing destinations by name", async () => {
+    const baliImage = {
+      sourceUrl: "https://images.unsplash.com/photo-bali?w=800&q=80",
+      filename: "bali.jpg",
+    };
+
     const entry = makeEntry({
       name: "Bali",
       rating: 4.0,
-      image: { sourceUrl: "https://images.unsplash.com/photo-bali?w=800&q=80", filename: "bali.jpg" },
+      image: baliImage,
     });
 
     await seedDestinations(db, [entry]);
@@ -271,7 +284,7 @@ describe("seedDestinations", () => {
     const updated = makeEntry({
       name: "Bali",
       rating: 4.7,
-      image: { sourceUrl: "https://images.unsplash.com/photo-bali?w=800&q=80", filename: "bali.jpg" },
+      image: baliImage,
     });
 
     await seedDestinations(db, [updated]);
@@ -298,10 +311,19 @@ describe("seedDestinations", () => {
   });
 
   it("handles mix of inserts and updates", async () => {
+    const baliImage = {
+      sourceUrl: "https://images.unsplash.com/bali?w=800&q=80",
+      filename: "bali.jpg",
+    };
+    const kyotoImage = {
+      sourceUrl: "https://images.unsplash.com/kyoto?w=800&q=80",
+      filename: "kyoto.jpg",
+    };
+
     const bali = makeEntry({
       name: "Bali",
       country: "Indonesia",
-      image: { sourceUrl: "https://images.unsplash.com/bali?w=800&q=80", filename: "bali.jpg" },
+      image: baliImage,
     });
 
     await seedDestinations(db, [bali]);
@@ -311,12 +333,12 @@ describe("seedDestinations", () => {
       name: "Bali",
       country: "Indonesia",
       description: "Updated description",
-      image: { sourceUrl: "https://images.unsplash.com/bali?w=800&q=80", filename: "bali.jpg" },
+      image: baliImage,
     });
     const kyoto = makeEntry({
       name: "Kyoto",
       country: "Japan",
-      image: { sourceUrl: "https://images.unsplash.com/kyoto?w=800&q=80", filename: "kyoto.jpg" },
+      image: kyotoImage,
     });
 
     await seedDestinations(db, [updatedBali, kyoto]);

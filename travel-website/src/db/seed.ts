@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
+import { pathToFileURL } from "url";
 
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -43,7 +44,7 @@ export function resolveImagePath(
 ): string {
   const resolved = path.resolve(baseDir, filename);
   const normalizedBase = path.resolve(baseDir);
-  if (!resolved.startsWith(normalizedBase + path.sep) && resolved !== normalizedBase) {
+  if (!resolved.startsWith(normalizedBase + path.sep)) {
     throw new Error(
       `Filename "${filename}" resolves outside the target directory`,
     );
@@ -181,7 +182,7 @@ async function main(): Promise<void> {
 
 const isMainModule =
   process.argv[1] &&
-  import.meta.url === `file://${process.argv[1]}`;
+  import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMainModule) {
   main().catch((error: unknown) => {
