@@ -208,7 +208,7 @@ Card anatomy:
   - Country / region line in `text-muted-foreground`
   - Rating display (star icon from `lucide-react` + numeric value)
   - Price level display (e.g., dollar-sign icons or "$$" text, filled/unfilled to show level)
-- **Full-card link**: The outermost element is a `<Link href={'/destinations/${id}'}>` wrapping the entire card, with `block` display.
+- **Full-card link**: The outermost element is a `` <Link href={`/destinations/${id}`}> `` wrapping the entire card, with `block` display.
 
 Hover behavior (the "soft floating effect"):
 
