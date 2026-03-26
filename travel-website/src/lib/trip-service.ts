@@ -180,7 +180,11 @@ export function addStop(
   const now = currentTimestamp();
   db.update(trips).set({ updatedAt: now }).where(eq(trips.id, tripId)).run();
 
-  return getTripDetail(userId, tripId)!;
+  const detail = getTripDetail(userId, tripId);
+  if (!detail) {
+    throw new Error(`Failed to retrieve trip detail after insert for tripId=${result.id}`);
+  }
+  return detail;
 }
 
 export function getStopsByTripId(tripId: number): TripStop[] {

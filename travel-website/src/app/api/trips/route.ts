@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { parseTripCreateBody, isValidationError } from "@/lib/trips";
+import { parseTripCreateBody, isValidationError, parseUserId } from "@/lib/trips";
 import { getUserTrips, createTrip } from "@/lib/trip-service";
-
-function parseUserId(session: { user?: { id?: string } } | null): number | null {
-  if (!session?.user?.id) return null;
-  const id = Number(session.user.id);
-  if (!Number.isInteger(id) || id < 1) return null;
-  return id;
-}
 
 export async function GET(): Promise<NextResponse> {
   try {

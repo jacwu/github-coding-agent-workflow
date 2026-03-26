@@ -1,20 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
+import { parseUserId, parseIdParam } from "@/lib/trips";
 import { deleteStop } from "@/lib/trip-service";
-
-function parseUserId(session: { user?: { id?: string } } | null): number | null {
-  if (!session?.user?.id) return null;
-  const id = Number(session.user.id);
-  if (!Number.isInteger(id) || id < 1) return null;
-  return id;
-}
-
-function parseIdParam(idParam: string): number | null {
-  const id = Number(idParam);
-  if (!Number.isInteger(id) || id < 1) return null;
-  return id;
-}
 
 export async function DELETE(
   _request: Request,

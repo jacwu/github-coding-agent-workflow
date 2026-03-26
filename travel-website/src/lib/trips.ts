@@ -28,6 +28,32 @@ function isValidStatus(value: string): value is TripStatus {
   return (VALID_STATUSES as readonly string[]).includes(value);
 }
 
+function validateOptionalDate(
+  value: unknown,
+  fieldName: string,
+): string | null | ValidationError {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || value === "" || !isValidDate(value)) {
+    return { error: `${fieldName} must be a valid date in YYYY-MM-DD format` };
+  }
+  return value;
+}
+
+// ─── Shared route helpers ───────────────────────────────────────────────────
+
+export function parseUserId(session: { user?: { id?: string } } | null): number | null {
+  if (!session?.user?.id) return null;
+  const id = Number(session.user.id);
+  if (!Number.isInteger(id) || id < 1) return null;
+  return id;
+}
+
+export function parseIdParam(idParam: string): number | null {
+  const id = Number(idParam);
+  if (!Number.isInteger(id) || id < 1) return null;
+  return id;
+}
+
 // ─── Request body types ─────────────────────────────────────────────────────
 
 export interface TripCreateBody {
@@ -76,22 +102,14 @@ export function parseTripCreateBody(body: unknown): TripCreateBody | ValidationE
   const title = obj.title.trim();
 
   // start_date is optional
-  let startDate: string | null = null;
-  if (obj.start_date !== undefined && obj.start_date !== null) {
-    if (typeof obj.start_date !== "string" || obj.start_date === "" || !isValidDate(obj.start_date)) {
-      return { error: "start_date must be a valid date in YYYY-MM-DD format" };
-    }
-    startDate = obj.start_date;
-  }
+  const startDateResult = validateOptionalDate(obj.start_date, "start_date");
+  if (isValidationError(startDateResult)) return startDateResult;
+  const startDate = startDateResult;
 
   // end_date is optional
-  let endDate: string | null = null;
-  if (obj.end_date !== undefined && obj.end_date !== null) {
-    if (typeof obj.end_date !== "string" || obj.end_date === "" || !isValidDate(obj.end_date)) {
-      return { error: "end_date must be a valid date in YYYY-MM-DD format" };
-    }
-    endDate = obj.end_date;
-  }
+  const endDateResult = validateOptionalDate(obj.end_date, "end_date");
+  if (isValidationError(endDateResult)) return endDateResult;
+  const endDate = endDateResult;
 
   // date range validation
   if (startDate !== null && endDate !== null && startDate > endDate) {
@@ -124,22 +142,14 @@ export function parseTripUpdateBody(body: unknown): TripUpdateBody | ValidationE
   const title = obj.title.trim();
 
   // start_date is optional
-  let startDate: string | null = null;
-  if (obj.start_date !== undefined && obj.start_date !== null) {
-    if (typeof obj.start_date !== "string" || obj.start_date === "" || !isValidDate(obj.start_date)) {
-      return { error: "start_date must be a valid date in YYYY-MM-DD format" };
-    }
-    startDate = obj.start_date;
-  }
+  const startDateResult = validateOptionalDate(obj.start_date, "start_date");
+  if (isValidationError(startDateResult)) return startDateResult;
+  const startDate = startDateResult;
 
   // end_date is optional
-  let endDate: string | null = null;
-  if (obj.end_date !== undefined && obj.end_date !== null) {
-    if (typeof obj.end_date !== "string" || obj.end_date === "" || !isValidDate(obj.end_date)) {
-      return { error: "end_date must be a valid date in YYYY-MM-DD format" };
-    }
-    endDate = obj.end_date;
-  }
+  const endDateResult = validateOptionalDate(obj.end_date, "end_date");
+  if (isValidationError(endDateResult)) return endDateResult;
+  const endDate = endDateResult;
 
   // date range validation
   if (startDate !== null && endDate !== null && startDate > endDate) {
@@ -175,22 +185,14 @@ export function parseStopCreateBody(body: unknown): StopCreateBody | ValidationE
   }
 
   // arrival_date is optional
-  let arrivalDate: string | null = null;
-  if (obj.arrival_date !== undefined && obj.arrival_date !== null) {
-    if (typeof obj.arrival_date !== "string" || obj.arrival_date === "" || !isValidDate(obj.arrival_date)) {
-      return { error: "arrival_date must be a valid date in YYYY-MM-DD format" };
-    }
-    arrivalDate = obj.arrival_date;
-  }
+  const arrivalDateResult = validateOptionalDate(obj.arrival_date, "arrival_date");
+  if (isValidationError(arrivalDateResult)) return arrivalDateResult;
+  const arrivalDate = arrivalDateResult;
 
   // departure_date is optional
-  let departureDate: string | null = null;
-  if (obj.departure_date !== undefined && obj.departure_date !== null) {
-    if (typeof obj.departure_date !== "string" || obj.departure_date === "" || !isValidDate(obj.departure_date)) {
-      return { error: "departure_date must be a valid date in YYYY-MM-DD format" };
-    }
-    departureDate = obj.departure_date;
-  }
+  const departureDateResult = validateOptionalDate(obj.departure_date, "departure_date");
+  if (isValidationError(departureDateResult)) return departureDateResult;
+  const departureDate = departureDateResult;
 
   // date range validation
   if (arrivalDate !== null && departureDate !== null && arrivalDate > departureDate) {

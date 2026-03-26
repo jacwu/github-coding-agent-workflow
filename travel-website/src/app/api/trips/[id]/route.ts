@@ -1,21 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { parseTripUpdateBody, isValidationError } from "@/lib/trips";
+import { parseTripUpdateBody, isValidationError, parseUserId, parseIdParam } from "@/lib/trips";
 import { getTripDetail, updateTrip, deleteTrip } from "@/lib/trip-service";
-
-function parseUserId(session: { user?: { id?: string } } | null): number | null {
-  if (!session?.user?.id) return null;
-  const id = Number(session.user.id);
-  if (!Number.isInteger(id) || id < 1) return null;
-  return id;
-}
-
-function parseIdParam(idParam: string): number | null {
-  const id = Number(idParam);
-  if (!Number.isInteger(id) || id < 1) return null;
-  return id;
-}
 
 export async function GET(
   _request: Request,
