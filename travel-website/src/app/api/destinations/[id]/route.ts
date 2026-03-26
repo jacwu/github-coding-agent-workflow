@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
 
-import { db } from "@/db";
-import { destinations } from "@/db/schema";
-import { serializeDestinationDetail } from "@/lib/destinations";
+import { getDestinationById } from "@/lib/destination-service";
 
 export async function GET(
   _request: Request,
@@ -20,20 +17,16 @@ export async function GET(
       );
     }
 
-    const row = db
-      .select()
-      .from(destinations)
-      .where(eq(destinations.id, id))
-      .get();
+    const result = getDestinationById(id);
 
-    if (!row) {
+    if (!result) {
       return NextResponse.json(
         { error: "Destination not found" },
         { status: 404 },
       );
     }
 
-    return NextResponse.json(serializeDestinationDetail(row));
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
