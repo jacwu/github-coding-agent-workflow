@@ -62,3 +62,33 @@ Implemented the destination list page (`/destinations`), search/filter interacti
 ## Remaining Items
 
 None — all items from the implementation plan are complete.
+
+## Revision Summary (2026-03-26)
+
+### Review Findings
+
+- The destination search input kept its own local state but only re-synced from the URL when the query string became empty, so browser back/forward navigation or direct navigation between filtered URLs could leave the visible keyword stale.
+- The root route still rendered the placeholder landing card instead of redirecting visitors into the destination browsing flow required by the design route map.
+
+### Revisions Made
+
+| File | Revision |
+|---|---|
+| `travel-website/src/components/DestinationFilters.tsx` | Replaced the render-time `setState` sync with a `useEffect` that keeps the keyword input aligned with any URL `q` changes, including non-empty search terms. |
+| `travel-website/src/app/page.tsx` | Replaced the placeholder home page with a server redirect to `/destinations` so the public entry route matches the documented browsing flow. |
+| `travel-website/src/app/page.test.ts` | Added a focused Vitest regression test that verifies the root page redirects to `/destinations`. |
+
+### Validation
+
+- `npm test -- src/app/page.test.ts` ✅
+- `npm run lint` ✅
+- `AUTH_SECRET=test-secret npm run build` ✅
+- `npm test` ✅ (140 tests passed)
+- Manual verification in the browser ✅
+  - Visiting `/` redirects to `/destinations`
+  - Navigating between `/destinations?q=bali` and `/destinations?q=paris` keeps the visible search input synchronized with the URL
+  - Screenshot reference: https://github.com/user-attachments/assets/ab14c5f5-3e2a-4835-bf87-b72604aae182
+
+### Remaining Items
+
+- None.

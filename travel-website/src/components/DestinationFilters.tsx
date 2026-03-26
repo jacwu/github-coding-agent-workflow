@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -36,10 +36,9 @@ export default function DestinationFilters() {
   const currentQ = useMemo(() => searchParams.get("q") ?? "", [searchParams]);
   const [keyword, setKeyword] = useState(currentQ);
 
-  // Sync keyword with URL when searchParams change (e.g., clear filters)
-  if (keyword !== currentQ && currentQ === "") {
-    setKeyword("");
-  }
+  useEffect(() => {
+    setKeyword(currentQ);
+  }, [currentQ]);
 
   const updateParams = useCallback(
     (updates: Record<string, string>, usePush = false) => {
