@@ -61,22 +61,31 @@ Task 9 should implement the following route handlers:
 
 This extends the repository-level API design by introducing the concrete nested delete route file that is required to support `DELETE /api/trips/:id/stops/:stopId`.
 
-### 2. Centralize ownership checks and persistence logic in a shared trip server module
+### 2. Centralize ownership checks and persistence logic in shared trip server modules
 
-To keep route handlers small and consistent, trip-specific query and mutation logic should live in one or two dedicated server modules, for example:
+To keep route handlers small and consistent, trip-specific logic should live in two dedicated server modules that mirror the established destination pattern (`destinations.ts` + `destination-service.ts`):
 
-- `travel-website/src/lib/trip-service.ts`
-- `travel-website/src/lib/trip-validation.ts`
+- `travel-website/src/lib/trips.ts` — request body parsing, validation helpers, response type interfaces, and serialization functions (analogous to `destinations.ts`)
+- `travel-website/src/lib/trip-service.ts` — user-scoped DB queries, transactional stop mutations, and reorder logic (analogous to `destination-service.ts`)
 
-Recommended responsibilities:
+Recommended responsibilities for `trips.ts`:
 
-- resolve the authenticated user id from `auth()`
-- fetch a trip scoped to a specific owner
-- serialize trip and stop rows into API payloads
-- validate request bodies
-- execute transactional stop mutations and reorder logic
+- parse and validate trip create/update request bodies
+- parse and validate stop create and reorder request bodies
+- define response type interfaces (`TripListItem`, `TripDetail`, `TripStopDetail`)
+- serialize Drizzle row objects into stable API response shapes
+- provide an `isValidationError` type guard consistent with the existing pattern in `destinations.ts`
 
-This mirrors the current destination-service approach and keeps route handlers focused on HTTP concerns.
+Recommended responsibilities for `trip-service.ts`:
+
+- fetch a trip scoped to a specific owner (`userId` + `tripId`)
+- list trips for a user with `stop_count`
+- insert and update trips
+- insert stops with computed `sort_order`
+- execute transactional bulk reorder
+- delete stops and compact remaining sort order
+
+Route handlers should focus only on HTTP concerns: calling `auth()`, delegating to these modules, and returning `NextResponse.json(...)`.
 
 ### 3. Require authentication on every trip endpoint
 
@@ -86,7 +95,7 @@ Recommended boundary behavior:
 
 - call `auth()` at the start of each route handler
 - if there is no session or no `session.user.id`, return `401` with `{ "error": "Authentication required" }`
-- parse `session.user.id` into an integer once and pass it into shared service functions
+- parse `session.user.id` (which is a string per the NextAuth type augmentation in `src/types/next-auth.d.ts`) into an integer using `Number(...)` and validate it is a positive integer before passing it into shared service functions
 
 Ownership rules:
 
@@ -174,7 +183,7 @@ Validation rules:
 - request body must be a JSON object
 - `title` is required for `POST`, required after normalization for `PUT`, and should be trimmed
 - title must not become empty after trimming
-- `start_date` and `end_date` are optional but, when provided, must be non-empty strings in ISO-like `YYYY-MM-DD` format
+- `start_date` and `end_date` are optional but, when provided, must be non-empty strings matching the `YYYY-MM-DD` format (validated with a pattern such as `/^\d{4}-\d{2}-\d{2}$/`)
 - if both dates are present, `start_date` must be less than or equal to `end_date`
 - `status` is optional on create and defaults to `"draft"`
 - accepted status values are only `draft`, `planned`, and `completed`
@@ -278,6 +287,7 @@ Validation rules:
 - each item must include a positive integer `id` and positive integer `sort_order`
 - stop ids must be unique within the request
 - sort orders must be unique and form a contiguous sequence starting at `1`
+- the number of items in the `stops` array must equal the total number of stops currently belonging to the trip — partial reorders are not supported
 - every referenced stop id must belong to the target trip
 
 Implementation notes:
@@ -308,7 +318,7 @@ Normalizing sort order after deletion keeps the API contract simple and prevents
 
 ### 13. Serialization should map internal fields to stable JSON keys
 
-As with the destination APIs, trip APIs should not expose raw Drizzle field names directly.
+As with the destination APIs, trip APIs should not expose raw Drizzle field names directly. The serialization helpers in `trips.ts` should follow the same pattern as `serializeDestinationListItem` and `serializeDestinationDetail` in `destinations.ts`.
 
 Recommended mappings:
 
@@ -322,6 +332,8 @@ Recommended mappings:
 - `departureDate` → `departure_date`
 
 Nullable fields should be returned as `null` rather than omitted so frontend consumers can rely on stable response shapes.
+
+Destination image filenames stored in the database (`destinations.image`) should be serialized into public image paths using the same `/images/destinations/{filename}` pattern used by the destination APIs. The implementation can reuse or replicate the `imageUrl` helper from `destinations.ts`.
 
 ### 14. Error handling contract
 
@@ -352,11 +364,11 @@ Recommended test files:
 
 Recommended test approach:
 
-- mock `server-only` as done in existing API tests
-- mock `@/db` with a getter-backed current database instance
-- mock `@/lib/auth` so tests can switch between unauthenticated and authenticated sessions without depending on Auth.js internals
-- create an in-memory SQLite schema containing `users`, `destinations`, `trips`, and `trip_stops`
-- dynamically import route modules inside test cases after mocks are configured
+- mock `server-only` as done in existing API tests: `vi.mock("server-only", () => ({}))`
+- mock `@/db` with a getter-backed current database instance: `vi.mock("@/db", () => ({ get db() { return currentDb; } }))`
+- mock `@/lib/auth` so tests can switch between unauthenticated and authenticated sessions — the mock should export an `auth` function that returns `Promise<Session | null>` where `Session` includes `{ user: { id: string } }`, allowing individual tests to set `mockSession` to `null` (unauthenticated) or `{ user: { id: "1" } }` (authenticated as user 1)
+- create an in-memory SQLite schema containing `users`, `destinations`, `trips`, and `trip_stops` tables using raw CREATE TABLE SQL (matching the column names and constraints in `src/db/schema.ts`)
+- dynamically import route modules inside test cases after mocks are configured, following the `const { GET } = await import("./route")` pattern used by destination route tests
 
 Critical scenarios:
 
@@ -367,9 +379,10 @@ Critical scenarios:
 5. stop creation rejects nonexistent destinations
 6. stop creation appends the next `sort_order`
 7. reorder rejects duplicate or non-contiguous sort orders
-8. reorder only succeeds when all referenced stops belong to the trip
-9. deleting a stop compacts remaining sort order
-10. trip/detail responses serialize destination image filenames into public image paths
+8. reorder rejects partial reorders that do not include all trip stops
+9. reorder only succeeds when all referenced stops belong to the trip
+10. deleting a stop compacts remaining sort order
+11. trip/detail responses serialize destination image filenames into public image paths
 
 ### 16. Manual verification after implementation
 
@@ -390,7 +403,7 @@ This ensures the full trip management workflow works before Task 10 begins build
 1. Write failing route tests for `/api/trips` covering authentication, user-scoped listing, create validation, and successful creation.
 2. Write failing route tests for `/api/trips/[id]` covering invalid ids, ownership enforcement, detail serialization, updates, and deletion.
 3. Write failing route tests for `/api/trips/[id]/stops` and `/api/trips/[id]/stops/[stopId]` covering add, reorder, delete, and sort-order normalization behavior.
-4. Add shared trip validation and service modules to encapsulate user-scoped queries, serializers, and transactional stop mutation logic.
+4. Add shared trip modules: `src/lib/trips.ts` for validation, parsing, type interfaces, and serialization helpers, and `src/lib/trip-service.ts` for user-scoped DB queries, transactional stop mutations, and reorder logic.
 5. Implement the four trip route files with `auth()`-based protection, explicit validation, and consistent JSON/error responses.
 6. Run targeted Vitest tests for the new trip route files and shared logic.
 7. Manually verify the authenticated trip API workflow against the running app before starting Task 10 UI work.
