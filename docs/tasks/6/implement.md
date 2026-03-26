@@ -38,3 +38,34 @@
 ## Remaining Items
 
 None. All requirements from the task document have been addressed.
+
+## Revision Update
+
+### Review Conclusion
+
+The existing Task 6 implementation already satisfied the design goals for curated seed data, local image downloads, idempotent database writes, and `.gitignore` handling. The revision phase identified one targeted resilience gap in the download flow: `downloadAllImages()` treated every `fs.access()` failure as “file missing,” which could incorrectly trigger a network download when the real problem was a permission or filesystem error.
+
+### Targeted Revisions
+
+| File | Revision |
+|---|---|
+| `travel-website/src/db/seed.ts` | Tightened the image existence check so only `ENOENT` is treated as a missing file; unexpected access errors now fail fast instead of attempting a download |
+| `travel-website/src/db/seed.test.ts` | Added a regression test covering unexpected `fs.access()` failures and updated mocks to distinguish missing-file errors from other filesystem errors |
+
+### Revision Validation
+
+- `npm run lint` ✅
+- `npm test` ✅ (90/90 tests passing)
+- `AUTH_SECRET=test-secret npm run build` ✅
+- `npm run db:migrate` ✅
+- `npm run db:seed` ✅
+- Manual verification after rerunning seed:
+  - 30 destination image files exist under `public/images/destinations/`
+  - the `destinations` table contains 30 rows
+  - `image` values store local filenames only (`url_images=0`)
+  - `price_level` remains within 1–5 and `rating` remains within 4.3–4.9
+  - a second `npm run db:seed` skips existing files and updates rows without creating duplicates
+
+### Remaining Items After Revision
+
+None.
