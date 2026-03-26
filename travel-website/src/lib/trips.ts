@@ -157,13 +157,14 @@ export function parseTripUpdateBody(body: unknown): TripUpdateBody | ValidationE
   }
 
   // status is required for PUT (full update)
-  let status: TripStatus = "draft";
-  if (obj.status !== undefined && obj.status !== null) {
-    if (typeof obj.status !== "string" || !isValidStatus(obj.status)) {
-      return { error: "status must be one of: draft, planned, completed" };
-    }
-    status = obj.status;
+  if (obj.status === undefined || obj.status === null) {
+    return { error: "status is required and must be one of: draft, planned, completed" };
   }
+
+  if (typeof obj.status !== "string" || !isValidStatus(obj.status)) {
+    return { error: "status must be one of: draft, planned, completed" };
+  }
+  const status = obj.status;
 
   return { title, startDate, endDate, status };
 }

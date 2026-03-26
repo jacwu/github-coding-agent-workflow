@@ -182,7 +182,7 @@ export function addStop(
 
   const detail = getTripDetail(userId, tripId);
   if (!detail) {
-    throw new Error(`Failed to retrieve trip detail after insert for tripId=${result.id}`);
+    throw new Error(`Failed to retrieve trip detail after insert for tripId=${tripId}`);
   }
   return detail;
 }
