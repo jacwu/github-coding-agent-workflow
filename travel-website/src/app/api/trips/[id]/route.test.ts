@@ -301,6 +301,25 @@ describe("PUT /api/trips/:id", () => {
     expect(response.status).toBe(400);
   });
 
+  it("returns 400 when status is missing for full PUT updates", async () => {
+    seedUser(testDb);
+    testDb.insert(trips).values({ userId: 1, title: "Trip", status: "draft" }).run();
+
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Updated Title" }),
+      }),
+      { params: Promise.resolve({ id: "1" }) },
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("status");
+  });
+
   it("updates trip metadata and returns updated detail", async () => {
     seedUser(testDb);
     testDb.insert(trips).values({
