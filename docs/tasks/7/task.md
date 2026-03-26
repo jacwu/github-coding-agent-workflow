@@ -31,13 +31,15 @@ The design should fit the existing Next.js App Router + Drizzle + SQLite archite
 
 - `docs/requirements.md` requires destination browsing with images, descriptions, ratings, search, filtering, and sorting (US-2.1 through US-2.3).
 - `docs/design.md` defines `GET /api/destinations` and `GET /api/destinations/:id` as public APIs and documents the main query parameters: `q`, `region`, `category`, `price_min`, `price_max`, `sort`, `page`, and `limit`.
+- The project uses Next.js 16.2.1 (not 15 as stated in `docs/design.md`). In Next.js 15+, route handler `params` is a `Promise` and must be awaited before use. This applies to the `[id]` route handler.
 - `travel-website/src/db/schema.ts` already defines a `destinations` table with the required fields for browsing: `name`, `description`, `country`, `region`, `category`, `priceLevel`, `rating`, `bestSeason`, `latitude`, `longitude`, `image`, and `createdAt`.
 - The schema uses camelCase TypeScript field names mapped to snake_case database columns, so the API layer must deliberately serialize JSON responses instead of returning raw database rows as-is.
+- Several destination fields are nullable in the schema: `description`, `region`, `bestSeason`, `latitude`, and `longitude`. The API serializer must handle `null` values for these fields.
 - Task 6 added `travel-website/src/db/destination-seed-data.ts` and `travel-website/src/db/seed.ts`, so a curated 30-destination dataset is expected to be present after seeding.
 - Seeded destination records store only the local image filename in `destinations.image`; the API must prepend `/images/destinations/` when returning image URLs.
 - `travel-website/src/app/api` currently contains only authentication routes. There are no existing destination route handlers yet.
 - Existing API code, such as `src/app/api/auth/register/route.ts`, uses plain Next.js route handlers with inline request validation and returns `NextResponse.json(...)`.
-- Existing route tests, such as `src/app/api/auth/register/route.test.ts`, mock `@/db`, use an in-memory SQLite database created with raw SQL, and exercise route handlers directly with `Request` objects.
+- Existing route tests, such as `src/app/api/auth/register/route.test.ts`, mock `@/db` using a `get db()` getter so the test database can be swapped per test, mock `server-only` with `vi.mock("server-only", () => ({}))`, use an in-memory SQLite database created with raw SQL, and exercise route handlers via dynamic import (`await import("./route")`) inside each test case.
 - The repository-level design mentions `sort=popularity`, but the current schema does not contain a dedicated popularity metric. Task 7 therefore needs a documented fallback that preserves the API contract without requiring a schema change.
 
 ## Proposed Design
@@ -106,8 +108,9 @@ The keyword search should be implemented as a case-insensitive SQL `LIKE` search
 Design notes:
 
 - Search input should be trimmed before query construction.
-- The implementation should escape SQL `LIKE` wildcard characters (`%` and `_`) in user input before embedding them in a pattern, preventing accidental pattern expansion.
-- Query construction should stay inside Drizzle expressions rather than string-building raw SQL, reducing injection risk.
+- The implementation should escape SQL `LIKE` wildcard characters (`%` and `_`) in user input before embedding them in a pattern, preventing accidental pattern expansion. Use a backslash (`\`) as the escape character and include the SQLite `ESCAPE '\'` clause in the query so the database engine interprets the escaped characters correctly.
+- Query construction should stay inside Drizzle expressions (e.g., `sql` tagged templates) rather than string-building raw SQL, reducing injection risk. Use `sql` template bindings for the search pattern value to ensure parameterized queries.
+- SQLite `LIKE` is case-insensitive for ASCII characters by default. All seeded destination data uses ASCII names and regions, so explicit `LOWER()` wrapping is not required for keyword search but could be added for extra safety.
 
 This approach gives the frontend useful broad search behavior without requiring a separate full-text search system.
 
@@ -117,8 +120,8 @@ The list endpoint should combine all provided filters with logical `AND`.
 
 Recommended filter semantics:
 
-- `region`: case-insensitive exact match against the seeded region values
-- `category`: case-insensitive exact match against the seeded category values
+- `region`: case-insensitive exact match against the seeded region values. Use `sql\`LOWER(${destinations.region}) = LOWER(${value})\`` or drizzle's `sql` template to ensure matching is case-insensitive regardless of user input casing.
+- `category`: case-insensitive exact match against the seeded category values. Same `LOWER()` approach as region.
 - `price_min`: `priceLevel >= price_min`
 - `price_max`: `priceLevel <= price_max`
 
@@ -177,7 +180,8 @@ Recommended response shape:
 
 Notes:
 
-- The response should stay aligned with `docs/design.md`.
+- The list response includes `region` in each data item, which is an intentional addition beyond the example in `docs/design.md` section 5.2. Including region in list items allows the frontend to display region badges and avoids requiring separate detail API calls just to show region information in destination cards.
+- The response should otherwise stay aligned with `docs/design.md`.
 - Returning an empty `data` array with `200` is correct when filters match no records.
 - The route should not return database-internal field names like `priceLevel` or raw image filenames.
 
@@ -185,7 +189,8 @@ Notes:
 
 `GET /api/destinations/:id` should:
 
-- parse `params.id` as a positive integer
+- accept the second argument as `{ params }: { params: Promise<{ id: string }> }` — in Next.js 15+/16, route handler `params` is a `Promise` that must be awaited before accessing properties
+- parse the awaited `params.id` as a positive integer
 - return `400` if the id is missing, non-numeric, or less than `1`
 - query the `destinations` table by primary key
 - return `404` if no destination exists for that id
@@ -221,9 +226,15 @@ Recommended serialization rules:
 - `priceLevel` → `price_level`
 - `bestSeason` → `best_season`
 - `image` filename → `/images/destinations/{filename}`
-- do not expose `createdAt`
+- do not expose `createdAt` (though it is still used internally for sort ordering)
+- nullable fields (`description`, `region`, `bestSeason`, `latitude`, `longitude`) should be returned as `null` in the JSON response when the database value is `null`, rather than being omitted from the payload. This keeps the response shape predictable for frontend consumers.
 
 Using explicit serializers avoids coupling the public API shape to internal Drizzle field naming and keeps the frontend contract stable even if internal naming changes later.
+
+Two serializer functions are recommended:
+
+- `serializeDestinationListItem(row)` — returns the subset of fields for list items (id, name, country, region, category, price_level, rating, image)
+- `serializeDestinationDetail(row)` — returns all fields for detail view (id, name, description, country, region, category, price_level, rating, best_season, latitude, longitude, image)
 
 ### 10. Error handling should remain simple and boundary-focused
 
@@ -248,11 +259,37 @@ Recommended test files:
 
 Recommended test approach:
 
-- mock `server-only` with `vi.mock("server-only", () => ({}))` where needed
-- mock `@/db` the same way the registration route test does
-- use an in-memory SQLite database created with raw `CREATE TABLE destinations (...)` SQL
-- seed only the rows needed for each test scenario
-- call the route handler directly with `Request` objects
+- mock `server-only` with `vi.mock("server-only", () => ({}))` at the top of each test file
+- mock `@/db` using a getter pattern so the test database can be swapped per test:
+  ```typescript
+  let currentDb: ReturnType<typeof drizzle>;
+  vi.mock("@/db", () => ({
+    get db() {
+      return currentDb;
+    },
+  }));
+  ```
+- use an in-memory SQLite database created with raw SQL matching the schema:
+  ```sql
+  CREATE TABLE destinations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    country TEXT NOT NULL,
+    region TEXT,
+    category TEXT NOT NULL,
+    price_level INTEGER NOT NULL,
+    rating REAL NOT NULL DEFAULT 0,
+    best_season TEXT,
+    latitude REAL,
+    longitude REAL,
+    image TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  ```
+- seed only the rows needed for each test scenario using drizzle `insert` or raw SQL
+- import route handlers dynamically inside each test case (`const { GET } = await import("./route")`) to ensure the mocked `@/db` getter picks up the current test database
+- call the route handler directly with constructed `Request` objects
 
 Key test scenarios:
 
@@ -263,8 +300,9 @@ Key test scenarios:
 5. invalid `page`, `limit`, `price_min`, `price_max`, and reversed price range return `400`
 6. `sort=rating`, `sort=price`, `sort=price_desc`, and `sort=popularity` produce deterministic ordering
 7. list responses convert local image filenames into public image URLs
-8. detail endpoint returns the expected full payload
-9. detail endpoint returns `400` for invalid ids and `404` for missing ids
+8. detail endpoint returns the expected full payload with correct field serialization
+9. detail endpoint returns `400` for invalid ids (non-numeric, zero, negative) and `404` for missing ids
+10. detail endpoint correctly handles the async `params` Promise (test should pass `params` as `Promise.resolve({ id: "1" })`)
 
 ### 12. Manual verification should focus on real API behavior
 
