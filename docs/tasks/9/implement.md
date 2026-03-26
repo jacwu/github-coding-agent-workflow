@@ -49,3 +49,29 @@
 ## Open Items
 
 None. All endpoints specified in the task document are implemented and tested.
+
+## Revision Update
+
+### Review Findings
+
+1. `PUT /api/trips/:id` did not fully enforce the task document's full-update contract because `status` was silently defaulted when omitted.
+2. `src/lib/trip-service.ts` contained an undefined `result` reference in the `addStop()` error path, which broke production type-check/build validation.
+
+### Targeted Revisions
+
+| File | Revision |
+|---|---|
+| `travel-website/src/app/api/trips/[id]/route.test.ts` | Added a regression test that requires `status` on full `PUT` updates |
+| `travel-website/src/lib/trips.ts` | Changed `parseTripUpdateBody()` to reject missing `status` instead of defaulting it |
+| `travel-website/src/lib/trip-service.ts` | Fixed the `addStop()` error message to reference `tripId` rather than an undefined variable |
+
+### Revision Validation
+
+- `npx vitest run src/app/api/trips/[id]/route.test.ts` ✅
+- `npm run lint` ✅
+- `npm test` ✅
+- `AUTH_SECRET=test-secret npm run build` ✅
+
+### Remaining Items
+
+None identified during this revision review.
