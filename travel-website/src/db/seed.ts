@@ -103,8 +103,11 @@ export async function downloadAllImages(
       await fs.access(destPath);
       console.log(`  ✓ Skipping "${entry.name}" — ${filename} already exists`);
       continue;
-    } catch {
-      // File doesn't exist, proceed to download
+    } catch (error: unknown) {
+      const accessError = error as NodeJS.ErrnoException;
+      if (accessError.code !== "ENOENT") {
+        throw error;
+      }
     }
 
     console.log(`  ↓ Downloading "${entry.name}" → ${filename}...`);

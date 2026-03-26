@@ -71,6 +71,10 @@ function makeEntry(overrides: Partial<DestinationSeedEntry> = {}): DestinationSe
   };
 }
 
+function makeMissingFileError(): NodeJS.ErrnoException {
+  return Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+}
+
 // ─── Helper validation tests ────────────────────────────────────────────────
 
 describe("isAllowedHost", () => {
@@ -166,7 +170,7 @@ describe("downloadAllImages", () => {
   });
 
   it("downloads and writes file when it does not exist", async () => {
-    mockedFs.access.mockRejectedValue(new Error("ENOENT"));
+    mockedFs.access.mockRejectedValue(makeMissingFileError());
     mockedFs.writeFile.mockResolvedValue(undefined);
 
     mockFetch.mockResolvedValue({
@@ -196,7 +200,7 @@ describe("downloadAllImages", () => {
   });
 
   it("throws on failed HTTP response", async () => {
-    mockedFs.access.mockRejectedValue(new Error("ENOENT"));
+    mockedFs.access.mockRejectedValue(makeMissingFileError());
 
     mockFetch.mockResolvedValue({
       ok: false,
@@ -211,7 +215,7 @@ describe("downloadAllImages", () => {
   });
 
   it("throws on non-image content type", async () => {
-    mockedFs.access.mockRejectedValue(new Error("ENOENT"));
+    mockedFs.access.mockRejectedValue(makeMissingFileError());
 
     mockFetch.mockResolvedValue({
       ok: true,
@@ -222,6 +226,15 @@ describe("downloadAllImages", () => {
     await expect(downloadAllImages([entry], "/tmp/test-images")).rejects.toThrow(
       /Invalid content type/,
     );
+  });
+
+  it("rethrows unexpected file access errors", async () => {
+    mockedFs.access.mockRejectedValue(new Error("permission denied"));
+
+    await expect(downloadAllImages([makeEntry()], "/tmp/test-images")).rejects.toThrow(
+      /permission denied/,
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 
