@@ -194,26 +194,6 @@ export default function TripEditor({ trip, destinationOptions }: TripEditorProps
     }
   }
 
-  async function handleMoveStop(direction: "up" | "down") {
-    const stops = [...trip.stops].sort((a, b) => a.sort_order - b.sort_order);
-    const idx = direction === "up"
-      ? stops.findIndex((s) => s.sort_order > 1)
-      : stops.length - 1;
-
-    // Build reordered array
-    const reordered = stops.map((s) => ({ ...s }));
-    let targetIdx: number;
-
-    if (direction === "up") {
-      targetIdx = reordered.findIndex((s) => s.sort_order > 1);
-    } else {
-      targetIdx = reordered.length - 1;
-    }
-
-    // This function is called with a specific stop, so we need a different approach
-    return; // placeholder - actual move logic below
-  }
-
   async function handleMoveStopById(stopId: number, direction: "up" | "down") {
     const stops = [...trip.stops].sort((a, b) => a.sort_order - b.sort_order);
     const idx = stops.findIndex((s) => s.id === stopId);
