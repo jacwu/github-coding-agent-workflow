@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
-import { resolveDatabasePath } from "./utils";
+import {
+  DEFAULT_DATABASE_URL,
+  getDatabaseUrl,
+  resolveDatabasePath,
+} from "./utils";
 
 describe("resolveDatabasePath", () => {
   it("strips the file: prefix from a file: URL", () => {
@@ -19,6 +23,10 @@ describe("resolveDatabasePath", () => {
     expect(resolveDatabasePath("/var/data/app.db")).toBe("/var/data/app.db");
   });
 
+  it("returns a Windows drive path as-is", () => {
+    expect(resolveDatabasePath("C:\\data\\app.db")).toBe("C:\\data\\app.db");
+  });
+
   it("throws for an unsupported protocol", () => {
     expect(() => resolveDatabasePath("postgres://localhost/db")).toThrow(
       'Unsupported DATABASE_URL protocol: "postgres://localhost/db"'
@@ -28,6 +36,22 @@ describe("resolveDatabasePath", () => {
   it("throws for an http: URL", () => {
     expect(() => resolveDatabasePath("http://example.com/db")).toThrow(
       "Only \"file:\" URLs or bare file paths are supported."
+    );
+  });
+});
+
+describe("getDatabaseUrl", () => {
+  it("returns the provided DATABASE_URL when it is supported", () => {
+    expect(getDatabaseUrl("file:./custom.db")).toBe("file:./custom.db");
+  });
+
+  it("falls back to the default DATABASE_URL", () => {
+    expect(getDatabaseUrl(undefined)).toBe(DEFAULT_DATABASE_URL);
+  });
+
+  it("throws early for an unsupported DATABASE_URL", () => {
+    expect(() => getDatabaseUrl("postgres://localhost/db")).toThrow(
+      'Unsupported DATABASE_URL protocol: "postgres://localhost/db"'
     );
   });
 });
