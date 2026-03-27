@@ -1,4 +1,4 @@
-import { count, eq } from "drizzle-orm";
+import { count, eq, asc } from "drizzle-orm";
 
 import { db } from "@/db";
 import { destinations } from "@/db/schema";
@@ -59,4 +59,22 @@ export function getDestinationById(id: number): DestinationDetail | null {
   if (!row) return null;
 
   return serializeDestinationDetail(row);
+}
+
+export interface DestinationOption {
+  id: number;
+  name: string;
+  country: string;
+}
+
+export function getDestinationOptions(): DestinationOption[] {
+  return db
+    .select({
+      id: destinations.id,
+      name: destinations.name,
+      country: destinations.country,
+    })
+    .from(destinations)
+    .orderBy(asc(destinations.name))
+    .all();
 }
