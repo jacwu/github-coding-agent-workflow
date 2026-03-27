@@ -212,6 +212,24 @@ describe("TripEditor", () => {
     });
   });
 
+  it("shows an itinerary error when reordering fails", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      json: () => Promise.resolve({ error: "Unable to reorder stops" }),
+    });
+
+    render(
+      <TripEditor trip={SAMPLE_TRIP} destinationOptions={SAMPLE_DESTINATIONS} />,
+    );
+
+    const moveDownButtons = screen.getAllByTitle("Move down");
+    fireEvent.click(moveDownButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("Unable to reorder stops")).toBeTruthy();
+    });
+  });
+
   it("calls DELETE /api/trips/:id/stops/:stopId for stop removal", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
@@ -230,6 +248,24 @@ describe("TripEditor", () => {
         "/api/trips/1/stops/10",
         expect.objectContaining({ method: "DELETE" }),
       );
+    });
+  });
+
+  it("shows an itinerary error when stop removal fails", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: false,
+      json: () => Promise.resolve({ error: "Unable to remove stop" }),
+    });
+
+    render(
+      <TripEditor trip={SAMPLE_TRIP} destinationOptions={SAMPLE_DESTINATIONS} />,
+    );
+
+    const removeButtons = screen.getAllByTitle("Remove stop");
+    fireEvent.click(removeButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText("Unable to remove stop")).toBeTruthy();
     });
   });
 

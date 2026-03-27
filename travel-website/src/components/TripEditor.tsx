@@ -56,6 +56,7 @@ export default function TripEditor({ trip, destinationOptions }: TripEditorProps
 
   // ── Reorder / delete stop state ──────────────────────────────────────
   const [stopActionPending, setStopActionPending] = useState(false);
+  const [stopActionError, setStopActionError] = useState<string | null>(null);
 
   // ── Handlers ─────────────────────────────────────────────────────────
 
@@ -210,6 +211,7 @@ export default function TripEditor({ trip, destinationOptions }: TripEditorProps
       return { id: s.id, sort_order: s.sort_order };
     });
 
+    setStopActionError(null);
     setStopActionPending(true);
     try {
       const res = await fetch(`/api/trips/${trip.id}/stops`, {
@@ -218,16 +220,21 @@ export default function TripEditor({ trip, destinationOptions }: TripEditorProps
         body: JSON.stringify({ stops: reordered }),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        const data = await res.json();
+        setStopActionError(data.error ?? "Failed to reorder stops");
+        return;
+      }
       router.refresh();
     } catch {
-      // silent fail for reorder
+      setStopActionError("An unexpected error occurred");
     } finally {
       setStopActionPending(false);
     }
   }
 
   async function handleDeleteStop(stopId: number) {
+    setStopActionError(null);
     setStopActionPending(true);
     try {
       const res = await fetch(`/api/trips/${trip.id}/stops/${stopId}`, {
@@ -235,9 +242,12 @@ export default function TripEditor({ trip, destinationOptions }: TripEditorProps
       });
       if (res.ok || res.status === 204) {
         router.refresh();
+        return;
       }
+      const data = await res.json();
+      setStopActionError(data.error ?? "Failed to remove stop");
     } catch {
-      // silent fail
+      setStopActionError("An unexpected error occurred");
     } finally {
       setStopActionPending(false);
     }
@@ -436,6 +446,10 @@ export default function TripEditor({ trip, destinationOptions }: TripEditorProps
               </div>
             </form>
           </div>
+        )}
+
+        {stopActionError && (
+          <p className="mb-4 text-sm text-destructive">{stopActionError}</p>
         )}
 
         {/* Stop list */}
