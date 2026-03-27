@@ -8,6 +8,7 @@ import {
   type TripUpdateBody,
   type StopCreateBody,
   type StopReorderItem,
+  type StopUpdateBody,
   type TripListItem,
   type TripDetail,
   serializeTripListItem,
@@ -290,4 +291,42 @@ export function deleteStop(
   });
 
   return true;
+}
+
+export function updateStop(
+  userId: number,
+  tripId: number,
+  stopId: number,
+  body: StopUpdateBody,
+): TripDetail | "trip_not_found" | "stop_not_found" {
+  const trip = getUserTripById(userId, tripId);
+  if (!trip) return "trip_not_found";
+
+  // Verify the stop belongs to this trip
+  const stop = db
+    .select()
+    .from(tripStops)
+    .where(and(eq(tripStops.id, stopId), eq(tripStops.tripId, tripId)))
+    .get();
+
+  if (!stop) return "stop_not_found";
+
+  const now = currentTimestamp();
+
+  db.update(tripStops)
+    .set({
+      arrivalDate: body.arrivalDate,
+      departureDate: body.departureDate,
+      notes: body.notes,
+    })
+    .where(and(eq(tripStops.id, stopId), eq(tripStops.tripId, tripId)))
+    .run();
+
+  db.update(trips).set({ updatedAt: now }).where(eq(trips.id, tripId)).run();
+
+  const detail = getTripDetail(userId, tripId);
+  if (!detail) {
+    throw new Error(`Failed to retrieve trip detail after update for tripId=${tripId}`);
+  }
+  return detail;
 }
