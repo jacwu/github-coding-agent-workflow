@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      copilot_requests: write
 
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,8 +45,6 @@ jobs:
           python scripts/create_branch.py "$BRANCH_NAME" --repo "$REPO"
 
       - name: Assign issue to Copilot
-        env:
-          GITHUB_TOKEN: ${{ secrets.COPILOT_ACTION_TOKEN }}
         run: |
           if [ -z "$GITHUB_TOKEN" ]; then
             echo "COPILOT_ACTION_TOKEN secret is required for Copilot issue assignment" >&2
