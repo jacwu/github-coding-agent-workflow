@@ -4,7 +4,7 @@
 
 The product requirements define trip planning as an authenticated user feature: users should be able to create trips, organize stops, and adjust itinerary details over time. Task 9 established the backend trip APIs and shared trip service layer, but the user-facing trip pages have not been built yet.
 
-Task 10 is the first frontend milestone for trip planning. It needs to turn the existing trip data model and APIs into a usable “My Trips” workflow where signed-in users can:
+Task 10 is the first frontend milestone for trip planning. It needs to turn the existing trip data model and APIs into a usable "My Trips" workflow where signed-in users can:
 
 - see the trips they have created
 - start a new trip from the UI
@@ -20,7 +20,7 @@ The design should stay consistent with the repository-wide requirements and the 
 
 Design the trip pages so authenticated users can manage their travel plans through two protected routes:
 
-- `/trips` — a “My Trips” overview page with list, empty state, and trip creation entry point
+- `/trips` — a "My Trips" overview page with list, empty state, and trip creation entry point
 - `/trips/[id]` — a trip detail and editing page for metadata and itinerary changes
 
 The design should minimize architectural churn by reusing the Task 9 trip service layer for initial server rendering and using the existing trip API routes for mutations where possible.
@@ -39,23 +39,24 @@ The design should minimize architectural churn by reusing the Task 9 trip servic
 - `docs/requirements.md` defines trip creation and itinerary customization in US-3.1 and US-3.2.
 - `docs/design.md` reserves `/trips` and `/trips/:id` as authenticated routes and defines the underlying trip and trip stop schema.
 - The application code lives under `travel-website/`, and the current app router includes destination pages, auth pages, and API routes, but no `src/app/trips/` page directory exists yet.
-- `travel-website/src/components/Navbar.tsx` already exposes a “My Trips” link for authenticated users, so the navigation entry point exists before the pages do.
+- `travel-website/src/components/Navbar.tsx` already exposes a "My Trips" link for authenticated users, so the navigation entry point exists before the pages do.
 - Task 9 added authenticated trip APIs and shared trip modules:
-  - `src/app/api/trips/route.ts`
-  - `src/app/api/trips/[id]/route.ts`
-  - `src/app/api/trips/[id]/stops/route.ts`
-  - `src/app/api/trips/[id]/stops/[stopId]/route.ts`
-  - `src/lib/trip-service.ts`
-  - `src/lib/trips.ts`
+  - `src/app/api/trips/route.ts` — `GET` (list) and `POST` (create)
+  - `src/app/api/trips/[id]/route.ts` — `GET`, `PUT`, `DELETE`
+  - `src/app/api/trips/[id]/stops/route.ts` — `POST` (add stop) and `PUT` (bulk reorder)
+  - `src/app/api/trips/[id]/stops/[stopId]/route.ts` — `DELETE` only
+  - `src/lib/trip-service.ts` — exports `getUserTrips`, `getTripDetail`, `createTrip`, `updateTrip`, `deleteTrip`, `addStop`, `reorderStops`, `deleteStop`, `getStopsByTripId`, `getDestinationById`
+  - `src/lib/trips.ts` — exports types (`TripStatus`, `TripCreateBody`, `TripUpdateBody`, `StopCreateBody`, `StopReorderItem`, `TripListItem`, `TripStopDetail`, `TripDetail`), validators (`parseTripCreateBody`, `parseTripUpdateBody`, `parseStopCreateBody`, `parseStopReorderBody`), and serializers (`serializeTripListItem`, `serializeTripStop`, `serializeTripDetail`)
 - Those APIs already support trip list/detail/create/update/delete, stop add, stop reorder, and stop delete, with ownership checks and response serialization.
 - Destination pages establish the current frontend pattern:
   - page-level data loading happens in server components
-  - `searchParams` and dynamic `params` are awaited
+  - `searchParams` and dynamic `params` are awaited (async in Next.js 16)
   - interactive UI is isolated in focused client components such as `DestinationFilters`
-- The login page already accepts a sanitized relative `callbackUrl`, which can be reused for protected trip page redirects.
+- The login page already accepts a sanitized relative `callbackUrl` query parameter, which can be reused for protected trip page redirects. The server action `loginAction` in `src/lib/actions/auth.ts` passes a sanitized `redirectTo` to `signIn()`.
 - Existing shared UI building blocks include `Button` and `Input`, and the visual style favors rounded cards, soft shadows, large whitespace, and simple empty states.
+- The test infrastructure uses Vitest 4.1.0 with a `node` environment. The vitest config at `travel-website/vitest.config.ts` includes only `src/**/*.test.ts` files (not `.test.tsx`). No DOM testing libraries such as `@testing-library/react` or `jsdom` are installed. All existing tests are server-side API route and utility tests that mock `@/db` with in-memory SQLite.
 - There is currently no trip-specific frontend component, no trip form workflow, and no UI for editing stop dates.
-- There is also a small capability gap between the current API surface and the Task 10 requirement: existing stop APIs support add, reorder, and delete, but they do not yet support updating an existing stop’s dates after it has been created.
+- There is a capability gap between the current API surface and the Task 10 requirement: existing stop APIs support add, reorder, and delete, but they do not yet support updating an existing stop's dates after it has been created. No `StopUpdateBody` type or `parseStopUpdateBody` validator exists in `trips.ts`, and no `updateStop` function exists in `trip-service.ts`.
 
 ## Proposed Design
 
@@ -65,21 +66,21 @@ Task 10 should add the following route files:
 
 | File | Type | Responsibility |
 |---|---|---|
-| `travel-website/src/app/trips/page.tsx` | Server page | Render the current user’s trip list and trip creation entry point |
+| `travel-website/src/app/trips/page.tsx` | Server page | Render the current user's trip list and trip creation entry point |
 | `travel-website/src/app/trips/[id]/page.tsx` | Server page | Render a specific trip and hand interactive editing to a client component |
 
 Authentication behavior:
 
 - Each page should call `auth()` on the server.
-- If no session is available, redirect to `/login` with a relative `callbackUrl` pointing back to the current trip page.
-- As on other dynamic routes, `params` and `searchParams` should be treated as async.
+- If no session is available, redirect to `/login?callbackUrl=/trips` (or `/login?callbackUrl=/trips/{id}` for the detail page).
+- As on other dynamic routes, `params` and `searchParams` should be treated as async (Next.js 16).
 - Invalid or non-owned trip ids on `/trips/[id]` should resolve to `notFound()` rather than exposing ownership details.
 
 This keeps trip pages aligned with the existing auth and routing patterns and avoids duplicating permission logic in the client.
 
 ### 2. Use server-side data access for initial page render
 
-As with the destination pages, server components should fetch initial data directly through internal server modules instead of calling the app’s own API routes.
+As with the destination pages, server components should fetch initial data directly through internal server modules instead of calling the app's own API routes.
 
 Recommended server-side reads:
 
@@ -89,29 +90,32 @@ Recommended server-side reads:
 - `/trips/[id]` page:
   - parse and validate the route id
   - call `getTripDetail(userId, tripId)` from `src/lib/trip-service.ts`
-  - fetch destination options for the “add stop” control through a lightweight server-side query helper
+  - fetch destination options for the "add stop" control through a lightweight server-side query helper
 
 Recommended destination-options helper:
 
-- add a small server-side read helper in the destination or trip service layer that returns destination ids and display labels for the stop picker
-- avoid reusing the paginated public destination list response for this purpose
-- keep the shape intentionally small, for example:
+- Add a `getDestinationOptions()` function to `src/lib/destination-service.ts` that returns all destinations with minimal fields for the stop picker.
+- Keep the shape intentionally small:
 
-```json
-[
-  {
-    "id": 16,
-    "name": "Kyoto",
-    "country": "Japan"
-  }
-]
+```typescript
+// in src/lib/destination-service.ts
+interface DestinationOption {
+  id: number;
+  name: string;
+  country: string;
+}
+
+async function getDestinationOptions(): Promise<DestinationOption[]>
 ```
 
-This approach preserves the current “server for reads, API for mutations” architecture and avoids unnecessary internal HTTP calls.
+- This queries the destinations table selecting only `id`, `name`, and `country`, ordered by name.
+- Avoid reusing the paginated public destination list response for this purpose.
+
+This approach preserves the current "server for reads, API for mutations" architecture and avoids unnecessary internal HTTP calls.
 
 ### 3. Build the `/trips` page around three states: empty, list, and create
 
-The “My Trips” page should be a server-rendered overview page with a minimal creation workflow.
+The "My Trips" page should be a server-rendered overview page with a minimal creation workflow.
 
 #### Page structure
 
@@ -137,9 +141,9 @@ When the user has no trips:
 
 To keep the experience simple and implementation scope controlled:
 
-- use a compact client component on the `/trips` page for trip creation
+- use a compact client component (`CreateTripForm`) on the `/trips` page for trip creation
 - collect only the minimum useful fields:
-  - title
+  - title (required)
   - optional start date
   - optional end date
 - default status to `draft`
@@ -163,9 +167,9 @@ Recommended primary component:
 
 This aligns with the repository-level design document, which already anticipates a `TripEditor` component in the component tree.
 
-### 5. Scope the editor to “basic editing” only
+### 5. Scope the editor to basic editing capabilities
 
-The detail page should prioritize the exact functionality required by the issue:
+The detail page should prioritize the exact functionality required by the issue.
 
 #### Trip metadata editing
 
@@ -174,14 +178,22 @@ Editable fields:
 - title
 - start date
 - end date
-- status
+- status (select from draft / planned / completed)
 
 Interaction model:
 
 - initialize the form from the server-rendered trip payload
 - submit metadata updates to `PUT /api/trips/[id]`
+- note that the existing `parseTripUpdateBody` requires both `title` and `status` as required fields in the update payload
 - show inline validation or server error feedback
 - call `router.refresh()` after success so server-rendered data stays authoritative
+
+#### Trip deletion
+
+- provide a delete action on the trip detail page (e.g. a secondary/danger button)
+- call `DELETE /api/trips/[id]`
+- on success, navigate to `/trips`
+- consider a simple confirmation prompt before deletion to prevent accidental data loss
 
 #### Stop management
 
@@ -193,17 +205,24 @@ For each stop, show:
 - departure date
 - notes when present
 - buttons for moving the stop up or down
+- inline edit controls for arrival date, departure date, and notes
 - remove action
 
 For adding a stop:
 
-- render a small form with a destination select
+- render a small form with a destination select (populated from destination options)
 - optionally allow initial arrival/departure dates and notes
 - submit to `POST /api/trips/[id]/stops`
 
+For editing stop dates and notes:
+
+- allow inline editing of arrival date, departure date, and notes on each stop card
+- submit to `PUT /api/trips/[id]/stops/[stopId]` (the new endpoint from section 6)
+- refresh after success
+
 For reordering:
 
-- prefer simple “Move up” / “Move down” controls over drag-and-drop
+- prefer simple "Move up" / "Move down" controls over drag-and-drop
 - compute the reordered full stop list client-side
 - submit the full order to `PUT /api/trips/[id]/stops`
 
@@ -214,15 +233,17 @@ For deletion:
 
 This yields a capable but intentionally basic editing experience that matches the task wording and avoids introducing large client-side dependencies.
 
-### 6. Close the stop-date editing gap with one small nested update capability
+### 6. Close the stop-date editing gap with a small API and service layer extension
 
-The current Task 9 API surface does not allow editing the dates of an already-created stop, which is required by this issue’s “adjust stop order and dates” language.
+The current Task 9 API surface does not allow editing the dates or notes of an already-created stop, which is required by this issue's "adjust stop order and dates" language.
 
-The recommended design is to extend the existing nested stop-detail route:
+#### API route addition
+
+Extend the existing nested stop-detail route:
 
 | File | New method | Responsibility |
 |---|---|---|
-| `travel-website/src/app/api/trips/[id]/stops/[stopId]/route.ts` | `PUT` | Update one stop’s editable fields |
+| `travel-website/src/app/api/trips/[id]/stops/[stopId]/route.ts` | `PUT` | Update one stop's editable fields |
 
 Recommended editable fields for the stop update request:
 
@@ -242,6 +263,26 @@ Recommended rules:
 - trim notes and store `null` when empty
 - enforce trip ownership and stop membership exactly as the delete route already does
 - return the canonical trip detail payload after update so the UI can refresh cleanly
+
+#### Shared module additions
+
+In `src/lib/trips.ts`:
+
+- Add a `StopUpdateBody` interface with optional `arrival_date`, `departure_date`, and `notes` fields
+- Add a `parseStopUpdateBody(body: unknown)` validator that:
+  - accepts an object with optional string fields for dates and notes
+  - validates `arrival_date <= departure_date` when both are present
+  - trims notes and converts empty string to `null`
+  - returns `StopUpdateBody | ValidationError`
+
+In `src/lib/trip-service.ts`:
+
+- Add an `updateStop(userId: number, tripId: number, stopId: number, body: StopUpdateBody)` function that:
+  - verifies trip ownership (reuse existing `getUserTripById`)
+  - verifies stop belongs to the trip
+  - updates the stop's `arrivalDate`, `departureDate`, and `notes` fields
+  - updates the trip's `updatedAt` timestamp
+  - returns the full `TripDetail` (reuse `getTripDetail`) or an error string
 
 This is the smallest API extension that directly supports the issue requirement without overloading the reorder endpoint or forcing awkward delete-and-recreate behavior.
 
@@ -276,13 +317,14 @@ The trip pages should reuse the same visual language already established by the 
 Recommended `/trips` page layout:
 
 - hero/header section
-- create-trip card
+- create-trip card or inline form
 - responsive grid or vertical stack of trip summary cards
 
 Recommended `/trips/[id]` page layout:
 
-- back link to “My Trips”
+- back link to "My Trips"
 - trip summary and metadata form near the top
+- delete trip action (secondary/danger styling, positioned away from primary actions)
 - itinerary section below
 - add-stop form adjacent to or above the stop list
 - stop list displayed as stacked cards for readability on narrow screens
@@ -316,26 +358,34 @@ Optional, but low-cost if implementation time allows:
 
 These can mirror the lightweight loading treatment already implied by the App Router architecture, but they are not essential if implementation remains intentionally minimal.
 
-### 10. Testing strategy should cover page protection, server rendering, and editor interactions
+### 10. Testing strategy
 
-Task 10 should follow TDD. Because the feature includes both protected server pages and client-side interactions, the test plan should cover both layers.
+Task 10 should follow TDD. The testing approach must work within the current infrastructure while extending it minimally for component tests.
 
-Recommended test files:
+#### Test infrastructure updates
+
+The current vitest config (`src/**/*.test.ts`, `environment: "node"`) does not support React component tests. The following minimal updates are needed:
+
+- Update `vitest.config.ts` to include `src/**/*.test.{ts,tsx}` in the test file pattern
+- Add a vitest workspace or per-file environment override so that component test files (`.test.tsx`) can use `jsdom` while existing server-side tests continue to use `node`. Vitest supports a `// @vitest-environment jsdom` directive at the top of individual test files for this purpose.
+- Install `jsdom` and `@testing-library/react` as dev dependencies (with `--legacy-peer-deps` for React 19 / Next.js 16 compatibility if needed)
+
+These changes are scoped to test infrastructure only and do not affect application code.
+
+#### Test files and coverage
 
 | File | Coverage |
 |---|---|
-| `travel-website/src/app/trips/page.test.ts` or `page.test.tsx` | redirects unauthenticated users, renders empty/list states from mocked trip data |
-| `travel-website/src/app/trips/[id]/page.test.ts` or `page.test.tsx` | invalid id handling, `notFound()` behavior, authenticated data loading, editor props wiring |
-| `travel-website/src/components/TripEditor.test.tsx` | metadata submit, add-stop submit, move up/down reorder payloads, stop-date update payloads, delete actions, error rendering |
+| `travel-website/src/app/trips/page.test.ts` | redirects unauthenticated users, renders trip list data from mocked service, handles empty state |
+| `travel-website/src/app/trips/[id]/page.test.ts` | invalid id handling, `notFound()` behavior, authenticated data loading, editor props wiring |
+| `travel-website/src/components/TripEditor.test.tsx` | metadata form submit, trip deletion, add-stop submit, move up/down reorder payloads, stop-date update payloads, stop delete actions, error rendering |
+| `travel-website/src/app/api/trips/[id]/stops/[stopId]/route.test.ts` | PUT handler for stop updates: validates dates, trims notes, rejects invalid payloads, enforces ownership |
 
-Recommended test techniques:
+#### Test techniques
 
-- mock `next/navigation` redirect and `notFound` behavior for server-page tests
-- mock `@/lib/auth` and `@/lib/trip-service` in page tests
-- keep page tests focused on routing, protection, and server-side branching
-- for client component tests, use the existing Vitest runner with a DOM-capable setup if needed
-
-If the current repository test setup proves insufficient for interactive component testing, adding lightweight React component testing support is acceptable during implementation, but only to the extent needed for the new trip UI tests.
+- **Server page tests** (`.test.ts`): mock `next/navigation` (`redirect`, `notFound`), mock `@/lib/auth` and `@/lib/trip-service`, and assert that the page function calls the correct service functions and redirects or renders appropriately. These follow the existing pattern used by destination and other page tests.
+- **API route tests** (`.test.ts`): use the existing in-memory SQLite pattern (create test DB, mock `@/db`, dynamic-import the route handler, assert on response status and body). This matches the existing trip API tests from Task 9.
+- **Component tests** (`.test.tsx`): use `@testing-library/react` with the `// @vitest-environment jsdom` directive. Mock `next/navigation` (`useRouter`), mock `fetch` for API calls, and test user interactions (form submission, button clicks, error display). Keep tests focused on integration behavior rather than implementation details.
 
 ### 11. Manual verification after implementation
 
@@ -346,21 +396,21 @@ After implementation, manual verification should cover the full trip workflow:
 3. create a trip from the list page and confirm redirect to `/trips/{id}`
 4. edit trip title, dates, and status
 5. add multiple stops
-6. change stop dates
+6. change stop dates and notes
 7. reorder stops with the basic controls
 8. remove a stop
-9. return to `/trips` and confirm the list reflects updated trip data
+9. delete a trip and confirm redirect to `/trips`
+10. return to `/trips` and confirm the list reflects updated trip data
 
 Implementation should also capture a screenshot of the new UI after manual verification, per the repository workflow expectations.
 
 ## Implementation Plan
 
-1. Add failing tests for `/trips` page protection and list/empty-state rendering.
-2. Add failing tests for `/trips/[id]` page protection, id validation, and not-found behavior.
-3. Add failing tests for the trip editor client component covering create, trip metadata update, stop add, reorder, date update, and delete flows.
-4. Add `src/app/trips/page.tsx` and `src/app/trips/[id]/page.tsx` as authenticated server pages that load data through existing server-side modules.
-5. Add the trip UI client component(s), centered on a `TripEditor` component for the detail page and a compact create-trip component for the list page.
-6. Add a minimal destination-options server helper for the add-stop selector.
-7. Extend `src/app/api/trips/[id]/stops/[stopId]/route.ts` with a focused `PUT` handler for stop date and notes updates, plus any tightly coupled validation/service support required for that route.
-8. Run targeted tests for the new trip pages, editor component, and stop-update API change.
-9. Manually verify the authenticated trip workflow and capture a screenshot of the completed UI.
+1. Update vitest config to include `.test.tsx` files. Install `jsdom` and `@testing-library/react` as dev dependencies.
+2. Add `StopUpdateBody` type and `parseStopUpdateBody` validator to `src/lib/trips.ts`. Add `updateStop` function to `src/lib/trip-service.ts`. Add `getDestinationOptions` to `src/lib/destination-service.ts`.
+3. Add failing tests for the new `PUT` stop-update API route. Implement the `PUT` handler in `src/app/api/trips/[id]/stops/[stopId]/route.ts`. Run targeted tests to confirm they pass.
+4. Add failing tests for `/trips` page protection and list/empty-state rendering. Implement `src/app/trips/page.tsx` as an authenticated server page. Run targeted tests to confirm they pass.
+5. Add failing tests for `/trips/[id]` page protection, id validation, not-found behavior, and editor props wiring. Implement `src/app/trips/[id]/page.tsx` as an authenticated server page. Run targeted tests to confirm they pass.
+6. Add failing tests for the `TripEditor` client component covering metadata update, trip deletion, stop add, reorder, date/notes update, and delete flows. Implement `src/components/TripEditor.tsx` and the compact `CreateTripForm` component (can be co-located in a separate file or inline). Run targeted tests to confirm they pass.
+7. Run the full test suite (`npm test`), linter (`npm run lint`), and build (`AUTH_SECRET=test-secret npm run build`) to verify no regressions.
+8. Manually verify the authenticated trip workflow end-to-end and capture screenshots.
