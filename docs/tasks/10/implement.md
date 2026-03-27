@@ -1,5 +1,33 @@
 # Task 10: Implementation Summary
 
+## Revision Updates
+
+### Revision scope
+- Reviewed the existing Task 10 implementation against the requirements and design documents.
+- Identified a gap in `TripEditor`: failed stop reorders and failed stop deletions were swallowed silently, even though the Task 10 design calls for local mutation error feedback in each form/section.
+
+### Targeted revisions
+- Updated `travel-website/src/components/TripEditor.tsx` to keep a dedicated itinerary action error state for stop reordering and stop removal.
+- Failed `PUT /api/trips/:id/stops` requests now show the returned server error (or a fallback message) instead of failing silently.
+- Failed `DELETE /api/trips/:id/stops/:stopId` requests now show the returned server error (or a fallback message) instead of failing silently.
+- Rendered the itinerary-level error message inline above the stop list so users can immediately understand why an action did not complete.
+
+### Revision tests
+- Extended `travel-website/src/components/TripEditor.test.tsx` with coverage for failed reorder and failed stop removal flows, asserting that the inline itinerary error is displayed.
+
+### Revision validation
+- `npm test -- src/components/TripEditor.test.tsx` ✅
+- Manual verification in the browser against a temporary seeded SQLite database:
+  - registered a user
+  - created a trip
+  - added a stop
+  - simulated a failed stop removal request and confirmed the inline itinerary error rendered
+- UI screenshot captured for the error-state verification. User-provided screenshot URL is suitable for PR notes: `https://github.com/user-attachments/assets/0aae0b5a-f8f9-45a5-8041-284ca890bb71`
+
+### Revision files changed
+- `travel-website/src/components/TripEditor.tsx`
+- `travel-website/src/components/TripEditor.test.tsx`
+
 ## Changes Made
 
 ### Test Infrastructure Updates
