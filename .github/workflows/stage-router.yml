@@ -37,6 +37,16 @@ jobs:
 
           echo "Issue source: $issue_source"
 
+          # Fallback: extract issue number from branch name (feature/<number>)
+          if [ -z "$issue_number" ]; then
+            head_ref="${{ github.event.pull_request.head.ref }}"
+            echo "No linked issue found, trying branch name: $head_ref"
+            if [[ "$head_ref" =~ ^feature/([0-9]+)$ ]]; then
+              issue_number="${BASH_REMATCH[1]}"
+              echo "Issue source: branch-name"
+            fi
+          fi
+
           if [ -z "$issue_number" ]; then
             echo "No linked issue found for PR #$PR_NUMBER"
             echo "issue_number=" >> "$GITHUB_OUTPUT"
