@@ -77,6 +77,12 @@ export interface StopCreateBody {
   notes: string | null;
 }
 
+export interface StopUpdateBody {
+  arrivalDate: string | null;
+  departureDate: string | null;
+  notes: string | null;
+}
+
 export interface StopReorderItem {
   id: number;
   sort_order: number;
@@ -271,6 +277,41 @@ export function parseStopReorderBody(body: unknown): StopReorderBody | Validatio
   }
 
   return { stops };
+}
+
+export function parseStopUpdateBody(body: unknown): StopUpdateBody | ValidationError {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { error: "Request body must be a JSON object" };
+  }
+
+  const obj = body as Record<string, unknown>;
+
+  // arrival_date is optional
+  const arrivalDateResult = validateOptionalDate(obj.arrival_date, "arrival_date");
+  if (isValidationError(arrivalDateResult)) return arrivalDateResult;
+  const arrivalDate = arrivalDateResult;
+
+  // departure_date is optional
+  const departureDateResult = validateOptionalDate(obj.departure_date, "departure_date");
+  if (isValidationError(departureDateResult)) return departureDateResult;
+  const departureDate = departureDateResult;
+
+  // date range validation
+  if (arrivalDate !== null && departureDate !== null && arrivalDate > departureDate) {
+    return { error: "arrival_date must be less than or equal to departure_date" };
+  }
+
+  // notes is optional
+  let notes: string | null = null;
+  if (obj.notes !== undefined && obj.notes !== null) {
+    if (typeof obj.notes !== "string") {
+      return { error: "notes must be a string" };
+    }
+    const trimmed = obj.notes.trim();
+    notes = trimmed.length > 0 ? trimmed : null;
+  }
+
+  return { arrivalDate, departureDate, notes };
 }
 
 // ─── Response types ─────────────────────────────────────────────────────────

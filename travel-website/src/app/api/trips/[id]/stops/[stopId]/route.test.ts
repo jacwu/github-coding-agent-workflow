@@ -278,3 +278,194 @@ describe("DELETE /api/trips/:id/stops/:stopId", () => {
     expect(remaining[0].sortOrder).toBe(1);
   });
 });
+
+describe("PUT /api/trips/:id/stops/:stopId", () => {
+  beforeEach(() => {
+    ({ db: testDb, sqlite: testSqlite } = createTestDb());
+    currentDb = testDb;
+    mockSession = { user: { id: "1" } };
+  });
+
+  afterEach(() => {
+    testSqlite.close();
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    mockSession = null;
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1/stops/1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrival_date: "2026-07-01" }),
+      }),
+      { params: Promise.resolve({ id: "1", stopId: "1" }) },
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns 400 for invalid trip id", async () => {
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/abc/stops/1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrival_date: "2026-07-01" }),
+      }),
+      { params: Promise.resolve({ id: "abc", stopId: "1" }) },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 400 for invalid stop id", async () => {
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1/stops/abc", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrival_date: "2026-07-01" }),
+      }),
+      { params: Promise.resolve({ id: "1", stopId: "abc" }) },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 400 for invalid date format", async () => {
+    seedUser(testDb);
+    seedDestination(testDb);
+    seedTrip(testDb);
+    seedStop(testDb);
+
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1/stops/1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrival_date: "not-a-date" }),
+      }),
+      { params: Promise.resolve({ id: "1", stopId: "1" }) },
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("arrival_date");
+  });
+
+  it("returns 400 when arrival_date > departure_date", async () => {
+    seedUser(testDb);
+    seedDestination(testDb);
+    seedTrip(testDb);
+    seedStop(testDb);
+
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1/stops/1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          arrival_date: "2026-07-10",
+          departure_date: "2026-07-01",
+        }),
+      }),
+      { params: Promise.resolve({ id: "1", stopId: "1" }) },
+    );
+
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("arrival_date must be less than or equal to departure_date");
+  });
+
+  it("returns 404 for non-owned trip", async () => {
+    seedUser(testDb, 1);
+    seedUser(testDb, 2);
+    seedDestination(testDb);
+    seedTrip(testDb, { userId: 2 });
+    seedStop(testDb, { tripId: 1 });
+
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1/stops/1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrival_date: "2026-07-01" }),
+      }),
+      { params: Promise.resolve({ id: "1", stopId: "1" }) },
+    );
+
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.error).toBe("Trip not found");
+  });
+
+  it("returns 404 for stop not belonging to the trip", async () => {
+    seedUser(testDb);
+    seedDestination(testDb);
+    seedTrip(testDb);
+
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1/stops/999", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ arrival_date: "2026-07-01" }),
+      }),
+      { params: Promise.resolve({ id: "1", stopId: "999" }) },
+    );
+
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.error).toBe("Stop not found");
+  });
+
+  it("updates stop dates and notes successfully", async () => {
+    seedUser(testDb);
+    seedDestination(testDb);
+    seedTrip(testDb);
+    seedStop(testDb);
+
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1/stops/1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          arrival_date: "2026-07-01",
+          departure_date: "2026-07-05",
+          notes: "Visit the temples",
+        }),
+      }),
+      { params: Promise.resolve({ id: "1", stopId: "1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.stops).toHaveLength(1);
+    expect(body.stops[0].arrival_date).toBe("2026-07-01");
+    expect(body.stops[0].departure_date).toBe("2026-07-05");
+    expect(body.stops[0].notes).toBe("Visit the temples");
+  });
+
+  it("trims notes and stores null when empty", async () => {
+    seedUser(testDb);
+    seedDestination(testDb);
+    seedTrip(testDb);
+    seedStop(testDb, { notes: "old notes" });
+
+    const { PUT } = await import("./route");
+    const response = await PUT(
+      new Request("http://localhost/api/trips/1/stops/1", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: "   " }),
+      }),
+      { params: Promise.resolve({ id: "1", stopId: "1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.stops[0].notes).toBeNull();
+  });
+});
