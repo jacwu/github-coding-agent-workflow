@@ -1,0 +1,27 @@
+name: copilot-review
+
+on:
+  pull_request_target:
+    types:
+      - opened
+    branches:
+      - main
+
+jobs:
+  copilot-review:
+    if: startsWith(github.event.pull_request.head.ref, 'feature/')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+
+    steps:
+      - name: Request Copilot review
+        run: |
+          gh api "repos/${REPO}/pulls/${PR}/requested_reviewers" \
+            --method POST \
+            -f "reviewers[]=copilot-pull-request-reviewer[bot]"
