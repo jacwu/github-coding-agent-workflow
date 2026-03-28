@@ -12,5 +12,6 @@ const dbPath = resolveDatabasePath(DATABASE_URL);
 const sqliteDb = new Database(dbPath);
 
 sqliteDb.pragma("journal_mode = WAL");
+sqliteDb.pragma("foreign_keys = ON");
 
 export const db = drizzle(sqliteDb, { schema });
