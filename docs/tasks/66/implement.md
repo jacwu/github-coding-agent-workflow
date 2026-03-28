@@ -2,7 +2,7 @@
 
 ## Revision Review (2026-03-28)
 
-- Reviewed `docs/requirements.md`, `docs/design.md`, `/home/runner/work/github-coding-agent-workflow/github-coding-agent-workflow/docs/tasks/66/task.md`, the existing schema implementation, migration, database initialization, and schema tests.
+- Reviewed `docs/requirements.md`, `docs/design.md`, `docs/tasks/66/task.md`, the existing schema implementation, migration, database initialization, and schema tests.
 - Confirmed that no code revision is required: the existing implementation already matches the design intent for the four core tables, Drizzle relations, migration, runtime foreign-key enforcement, and regression coverage.
 - Re-ran the current validation commands to verify the implementation still works as described below.
 
