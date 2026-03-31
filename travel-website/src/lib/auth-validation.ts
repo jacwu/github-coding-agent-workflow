@@ -17,10 +17,20 @@ interface RegistrationInput {
   name: unknown;
 }
 
+interface LoginInput {
+  email: unknown;
+  password: unknown;
+}
+
 interface ValidatedRegistration {
   email: string;
   password: string;
   name: string;
+}
+
+interface ValidatedLogin {
+  email: string;
+  password: string;
 }
 
 interface ValidationResult {
@@ -89,4 +99,31 @@ export function validateRegistration(
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+export function validateLoginCredentials(input: LoginInput): ValidatedLogin | null {
+  const { email, password } = input;
+
+  if (typeof email !== "string" || typeof password !== "string") {
+    return null;
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+
+  if (
+    normalizedEmail.length === 0 ||
+    normalizedEmail.length > EMAIL_MAX_LENGTH ||
+    !EMAIL_REGEX.test(normalizedEmail)
+  ) {
+    return null;
+  }
+
+  if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {
+    return null;
+  }
+
+  return {
+    email: normalizedEmail,
+    password,
+  };
 }

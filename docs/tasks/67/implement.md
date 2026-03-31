@@ -55,3 +55,43 @@
 ## Open Items
 
 None — all requirements from `docs/tasks/67/task.md` are fulfilled.
+
+## Revision Summary — 2026-03-31
+
+### Review Conclusion
+
+The authentication foundation already satisfied the main issue requirements, so this revision stayed intentionally small and focused on two edge-case hardening improvements in the existing implementation.
+
+### Targeted Revisions
+
+1. **Hardened credentials login input handling**
+   - Added `validateLoginCredentials()` in `travel-website/src/lib/auth-validation.ts`.
+   - Updated `travel-website/src/lib/auth.ts` to validate `credentials?.email` and `credentials?.password` safely before accessing them.
+   - This prevents the Credentials provider from throwing if NextAuth calls `authorize()` with a missing or malformed credentials object, and it now rejects invalid email / out-of-bounds password input consistently.
+
+2. **Enforced normalization at the service boundary**
+   - Updated `travel-website/src/lib/auth-service.ts` so `createUser()` now normalizes email and trims name before insert.
+   - This keeps the normalization invariant inside the auth service rather than relying entirely on upstream route callers, reducing the risk of mixed-case duplicate-account edge cases if the service is reused directly in future tasks.
+
+### Tests Added/Updated
+
+- `travel-website/src/lib/auth-validation.test.ts`
+  - Added focused tests for `validateLoginCredentials()` covering:
+    - valid normalized credentials
+    - missing credentials fields
+    - invalid email / short password / oversized password rejection
+- `travel-website/src/lib/auth-service.test.ts`
+  - Added a test proving `createUser()` stores normalized email and trimmed name
+
+### Validation
+
+| Check | Result |
+|---|---|
+| `npm run test -- src/lib/auth-validation.test.ts src/lib/auth-service.test.ts` | Passing — 30 targeted auth tests |
+| `npm run lint` | Passing |
+| `AUTH_SECRET=test-secret npm run build` | Passing |
+| `npm run test` | Passing — 68 tests across 6 files |
+
+### Remaining Items
+
+None.
