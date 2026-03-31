@@ -6,7 +6,7 @@
 
 The preceding infrastructure tasks have already established the prerequisites this issue should build on:
 
-- `travel-website/` is a working Next.js App Router application with strict TypeScript.
+- `travel-website/` is a working Next.js 16.2.1 App Router application with strict TypeScript.
 - SQLite + Drizzle ORM are configured and available through `src/db/index.ts`.
 - The `users` table already exists in `src/db/schema.ts` with the fields required for credentials-based auth (`email`, `password_hash`, `name`).
 
@@ -14,7 +14,7 @@ Issue #67 should therefore focus on the backend authentication foundation only: 
 
 ## Goal
 
-Establish the application’s authentication backend so later tasks can implement protected pages and authenticated UI flows on top of it.
+Establish the application's authentication backend so later tasks can implement protected pages and authenticated UI flows on top of it.
 
 This issue should deliver:
 
@@ -42,15 +42,17 @@ Verified against the current repository:
   - `POST /api/auth/register`
   - `POST /api/auth/[...nextauth]`
   - protected trip routes that depend on authentication
-- `travel-website/package.json` does **not** currently include `next-auth` or a password-hashing library.
+- `travel-website/package.json` does **not** currently include `next-auth`, `@auth/core`, or a password-hashing library such as `bcryptjs`.
 - `travel-website/src/lib/` currently contains only `utils.ts`; there is no existing auth configuration module.
-- `travel-website/src/app/` currently has no `(auth)` pages and no `api/auth/` routes yet.
+- The entire `travel-website/src/app/api/` directory does **not** exist yet — there are no API routes of any kind. The `src/app/` directory currently contains only `layout.tsx`, `page.tsx`, `globals.css`, and `favicon.ico`.
+- The `travel-website/src/types/` directory does **not** exist yet.
 - `travel-website/src/db/schema.ts` already defines a `users` table with:
   - unique `email`
   - `passwordHash`
   - `name`
   - optional `avatarUrl`
-- `travel-website/src/db/index.ts` already exports a shared Drizzle client and enables SQLite foreign keys.
+- `travel-website/src/db/index.ts` exports a shared Drizzle client, enables SQLite foreign keys, and imports `server-only` — meaning it cannot be imported in client components or directly in Vitest test files (see Testing strategy below).
+- `.env.example` currently contains only `DATABASE_URL=file:./sqlite.db`.
 
 This means the remaining gap is not schema work, but the application-layer authentication flow that consumes the existing schema safely and consistently.
 
@@ -58,7 +60,16 @@ This means the remaining gap is not schema work, but the application-layer authe
 
 ### 1. Authentication approach
 
-Use **NextAuth.js with the Credentials provider** and **JWT-based sessions**.
+Use **NextAuth.js v5 with the Credentials provider** and **JWT-based sessions**.
+
+NextAuth v5 is the version that provides first-class support for the Next.js App Router pattern and is compatible with Next.js 16 and React 19 as used in this project. It exports `NextAuth()` from `next-auth` (not from `next-auth/react`), which returns:
+
+- `handlers` — `{ GET, POST }` for the catch-all API route
+- `auth` — async function to retrieve the session on the server
+- `signIn` — server-side sign-in helper
+- `signOut` — server-side sign-out helper
+
+from a shared `src/lib/auth.ts` module.
 
 This is the best fit for the current application state because:
 
@@ -66,15 +77,6 @@ This is the best fit for the current application state because:
 - credentials login does not require introducing external OAuth configuration
 - JWT sessions avoid adding a separate NextAuth adapter/session table before it is needed
 - future server components and API routes can call `auth()` directly to access the current user
-
-The implementation should use the NextAuth App Router pattern that exports:
-
-- `handlers`
-- `auth`
-- `signIn`
-- `signOut`
-
-from a shared `src/lib/auth.ts` module.
 
 ### 2. File and module layout
 
@@ -96,13 +98,16 @@ travel-website/
 │       └── next-auth.d.ts
 ```
 
+Note: Both `src/app/api/` and `src/types/` are new directories that must be created as part of this task.
+
 Recommended responsibilities:
 
 - **`src/lib/auth.ts`**
-  - owns the NextAuth configuration
+  - owns the NextAuth v5 configuration via `NextAuth({ ... })`
   - defines the Credentials provider
   - exports `handlers`, `auth`, `signIn`, and `signOut`
   - defines JWT/session callbacks so `session.user.id` is available server-side
+  - sets `trustHost: true` so the app works in development and test environments without requiring explicit `NEXTAUTH_URL`
 
 - **`src/lib/auth-service.ts`**
   - contains pure server-side auth operations against the database
@@ -111,10 +116,12 @@ Recommended responsibilities:
     - `verifyPasswordLogin(email, password)`
     - `createUser(input)`
   - centralizes DB reads/writes so the NextAuth config and registration route do not duplicate logic
+  - imports `db` from `@/db` for production use; tests provide their own DB instance (see Testing strategy)
 
 - **`src/lib/auth-validation.ts`**
   - validates and normalizes auth payloads
   - keeps request validation separate from route handlers and DB access
+  - must be a pure module with no database or `server-only` imports so it is easily testable in Vitest
 
 - **`src/app/api/auth/[...nextauth]/route.ts`**
   - re-exports `GET` and `POST` from `handlers`
@@ -124,7 +131,7 @@ Recommended responsibilities:
   - returns safe user fields, never password hashes
 
 - **`src/types/next-auth.d.ts`**
-  - augments NextAuth `Session`/`User`/`JWT` types so the authenticated user ID is typed throughout the app
+  - augments NextAuth `Session`/`User`/`JWT` types so the authenticated user ID (`string`) is typed throughout the app
 
 The exact helper filenames can be adjusted during implementation, but the design should preserve a clear split between:
 
@@ -134,12 +141,13 @@ The exact helper filenames can be adjusted during implementation, but the design
 
 ### 3. Dependency additions
 
-Add the minimal runtime dependencies needed for credentials auth:
+Add the minimal runtime and type dependencies needed for credentials auth:
 
-| Package | Purpose |
-|---|---|
-| `next-auth` | NextAuth integration for App Router |
-| `bcryptjs` | password hashing and comparison |
+| Package | Category | Purpose |
+|---|---|---|
+| `next-auth` (v5) | dependency | NextAuth integration for App Router |
+| `bcryptjs` | dependency | password hashing and comparison |
+| `@types/bcryptjs` | devDependency | TypeScript type definitions for bcryptjs (required by strict mode) |
 
 No adapter package is required in this issue because the design uses JWT sessions rather than database-backed NextAuth sessions.
 
@@ -161,7 +169,7 @@ The provider accepts:
 3. Query the user by email from the `users` table.
 4. Compare the submitted password against `users.passwordHash` using `bcryptjs.compare`.
 5. If valid, return a safe user object containing only:
-   - `id`
+   - `id` (as a string, since NextAuth v5 `User.id` is `string`)
    - `email`
    - `name`
    - optionally `image` if mapped from `avatarUrl`
@@ -171,13 +179,15 @@ The provider accepts:
 
 Because protected pages and APIs will need the database user ID, the JWT and session callbacks should persist it:
 
-- on sign-in, set `token.sub` or `token.userId` from the database user ID
-- on session creation, copy that value to `session.user.id`
+- in the `jwt` callback: on initial sign-in, set `token.sub` from the user ID (converted to string)
+- in the `session` callback: copy `token.sub` to `session.user.id`
 
 This gives future code a stable pattern:
 
-- `const session = await auth()`
-- `session?.user?.id`
+```typescript
+const session = await auth();
+session?.user?.id; // string — the database user ID
+```
 
 ### 5. Registration endpoint design
 
@@ -209,7 +219,7 @@ The route should validate at least:
 Recommended initial bounds:
 
 - `email`: non-empty, valid format, max 254 characters
-- `password`: min 8 characters, max 72 characters
+- `password`: min 8 characters, max 72 characters (bcrypt truncates beyond 72 bytes)
 - `name`: min 1 character after trim, max 100 characters
 
 #### Behavior
@@ -230,10 +240,16 @@ Recommended initial bounds:
 
 #### Error handling
 
-Use explicit API responses at the route boundary:
+Use explicit API responses at the route boundary with a consistent JSON error shape:
+
+```json
+{ "error": "Human-readable error message" }
+```
+
+Status codes:
 
 - `400` for malformed JSON or missing required fields
-- `422` for structurally valid JSON that fails field validation
+- `422` for structurally valid JSON that fails field validation (e.g. invalid email format, password too short)
 - `409` when the email already exists
 - `500` only for unexpected failures
 
@@ -251,62 +267,78 @@ Because this issue introduces credential handling, the design must explicitly pr
 - validate input length bounds to reduce abuse and accidental oversized payloads
 - require `AUTH_SECRET` for NextAuth session signing
 
-An `.env.example` update should document the auth secret requirement alongside the existing database configuration, for example:
+An `.env.example` update should document the auth secret requirement alongside the existing database configuration:
 
 ```env
 DATABASE_URL=file:./sqlite.db
 AUTH_SECRET=replace-with-a-long-random-secret
 ```
 
+Note: The existing build command (`npm run build`) will require `AUTH_SECRET` to be set in the environment (e.g. `AUTH_SECRET=test-secret npm run build`) once NextAuth is integrated.
+
 ### 7. Relationship to future tasks
 
 This issue should provide the backend foundation that later tasks consume:
 
-- **Task 5** can build `/login` and `/register` pages on top of:
+- Login/register page tasks can build `/login` and `/register` pages on top of:
   - `POST /api/auth/register`
   - `signIn("credentials", ...)`
   - `signOut()`
-- **Task 9 / Task 10** can protect trip APIs and pages via `await auth()`
+- Trip API/page tasks can protect trip endpoints and pages via `await auth()`
 - the navigation bar can later render user state from the same session object
 
-To keep this issue narrowly scoped, it should **not** yet configure custom auth pages such as `pages.signIn = "/login"` unless the corresponding route exists. Until the login page task lands, the backend should remain usable by API consumers and future UI work without assuming the custom page is already present.
+To keep this issue narrowly scoped, it should **not** yet configure custom auth pages such as `pages: { signIn: "/login" }` in the NextAuth config. Without custom pages configured, NextAuth v5 serves a built-in sign-in page at `/api/auth/signin`. This is acceptable for the current scope — the custom login page will be wired in by a later task once the page route exists.
 
 ### 8. Testing strategy
 
 Implementation should follow TDD and add focused backend tests for the new auth foundation.
 
-Recommended coverage:
+#### Testing infrastructure notes
 
-1. **Validation tests**
+The existing test pattern in this repository (see `src/db/schema.test.ts`) uses in-memory SQLite databases (`:memory:`) created per test suite for full isolation. Auth-service tests should follow this same pattern.
+
+Because `src/db/index.ts` imports the `server-only` package (which throws when imported outside a server context), test files **cannot** directly import the production `db` instance. Instead:
+
+- **`auth-validation.ts` tests** require no database — they test pure validation logic.
+- **`auth-service.ts` tests** should create their own in-memory Drizzle database (matching the pattern in `schema.test.ts`) and pass it to service functions via dependency injection or by structuring the service module to accept a `db` parameter in its functions.
+- **Route handler tests** should unit-test the underlying service/validation functions rather than instantiating full Next.js request/response cycles. If route-level integration tests are needed, mock the database module.
+
+#### Recommended coverage
+
+1. **Validation tests** (`src/lib/auth-validation.test.ts`)
    - registration payload validation accepts normalized valid input
    - invalid email, short password, empty name, and oversized fields are rejected
+   - email normalization (trim + lowercase) works correctly
 
-2. **Registration route tests**
+2. **Auth-service tests** (`src/lib/auth-service.test.ts`)
+   - `createUser` hashes the password (stored value differs from plaintext)
+   - `createUser` returns only safe user fields (no `passwordHash`)
+   - `createUser` rejects duplicate emails
+   - `findUserByEmail` returns the user or `null`
+   - `verifyPasswordLogin` succeeds with correct credentials
+   - `verifyPasswordLogin` returns `null` for unknown email
+   - `verifyPasswordLogin` returns `null` for wrong password
+   - mixed-case email lookup succeeds after normalization
+
+3. **Registration route tests** (`src/app/api/auth/register/route.test.ts`)
    - successful registration returns `201` and safe user fields only
    - duplicate email returns `409`
-   - invalid payload returns `422`
-   - stored password is hashed rather than plaintext
+   - invalid payload returns `400` or `422`
 
-3. **Credentials authorize tests**
-   - valid email/password returns a safe user object
-   - unknown email returns `null`
-   - wrong password returns `null`
-   - mixed-case email login succeeds after normalization
+4. **Session callback tests** (`src/lib/auth.test.ts`)
+   - JWT callback sets `token.sub` from user ID on sign-in
+   - session callback copies `token.sub` to `session.user.id`
 
-4. **Session callback tests**
-   - authenticated user ID is copied into the JWT/session shape used by the app
-
-These tests should be co-located with the auth modules using the repository’s existing Vitest conventions.
+These tests should be co-located with the auth modules using the repository's existing Vitest conventions (`src/**/*.test.ts` pattern, `@/*` path alias).
 
 ## Implementation Plan
 
-1. Add `next-auth` and `bcryptjs` to `travel-website/package.json` and keep `package-lock.json` in sync.
-2. Add or update environment documentation so `AUTH_SECRET` is documented next to `DATABASE_URL`.
-3. Create `src/lib/auth-validation.ts` with reusable input normalization and validation for login/registration payloads.
-4. Create `src/lib/auth-service.ts` with database-backed helpers for user lookup, password verification, and user creation.
-5. Create `src/lib/auth.ts` with the NextAuth Credentials provider, JWT session strategy, and callbacks that expose `session.user.id`.
-6. Create `src/app/api/auth/[...nextauth]/route.ts` that re-exports the NextAuth handlers.
-7. Create `src/app/api/auth/register/route.ts` that validates input, hashes passwords, inserts the user, and returns safe user fields with correct status codes.
-8. Add `src/types/next-auth.d.ts` so `session.user.id` and the credential-login user shape are properly typed.
-9. Write focused Vitest coverage for validation, registration, authorize behavior, and session shaping before implementing the final logic.
-10. Validate with targeted auth tests first, then run the repository auth-related build/lint/test commands before considering the task complete.
+1. Install dependencies: add `next-auth` (v5) and `bcryptjs` as dependencies, `@types/bcryptjs` as a devDependency in `travel-website/package.json`. Run `npm install` to keep `package-lock.json` in sync.
+2. Update `travel-website/.env.example` to document the `AUTH_SECRET` variable alongside `DATABASE_URL`.
+3. Create `src/types/next-auth.d.ts` to augment `Session`, `User`, and `JWT` types with user `id`.
+4. Create `src/lib/auth-validation.ts` — write validation tests first (`auth-validation.test.ts`), then implement the validation and normalization logic.
+5. Create `src/lib/auth-service.ts` — write service tests first (`auth-service.test.ts`) using in-memory SQLite (matching the `schema.test.ts` pattern), then implement `findUserByEmail`, `verifyPasswordLogin`, and `createUser`.
+6. Create `src/lib/auth.ts` with the NextAuth v5 Credentials provider, JWT session strategy, `trustHost: true`, and callbacks that expose `session.user.id`. Write session callback tests (`auth.test.ts`).
+7. Create the directory structure `src/app/api/auth/[...nextauth]/` and add `route.ts` that re-exports `GET` and `POST` from `handlers`.
+8. Create `src/app/api/auth/register/route.ts` that validates input, hashes passwords, inserts the user, and returns safe user fields with correct status codes. Write route-level tests (`route.test.ts`).
+9. Run all targeted auth tests, then run the full test suite (`npm run test`), linter (`npm run lint`), and build (`AUTH_SECRET=test-secret npm run build`) to verify nothing is broken.
