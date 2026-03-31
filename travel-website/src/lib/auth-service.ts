@@ -50,14 +50,16 @@ export async function createUser(
   db: DbClient,
   input: { email: string; password: string; name: string },
 ): Promise<SafeUser> {
+  const normalizedEmail = normalizeEmail(input.email);
+  const trimmedName = input.name.trim();
   const passwordHash = await hash(input.password, BCRYPT_ROUNDS);
 
   const result = await db
     .insert(users)
     .values({
-      email: input.email,
+      email: normalizedEmail,
       passwordHash,
-      name: input.name,
+      name: trimmedName,
     })
     .returning();
 

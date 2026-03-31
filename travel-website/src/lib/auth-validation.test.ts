@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { validateRegistration, normalizeEmail } from "./auth-validation";
+import { validateRegistration, validateLoginCredentials, normalizeEmail } from "./auth-validation";
 
 // ---------------------------------------------------------------------------
 // normalizeEmail
@@ -117,5 +117,30 @@ describe("validateRegistration", () => {
   it("rejects name exceeding 100 characters", () => {
     const result = validateRegistration({ ...validInput, name: "a".repeat(101) });
     expect(result).toEqual({ success: false, error: "name must not exceed 100 characters" });
+  });
+});
+
+describe("validateLoginCredentials", () => {
+  it("accepts valid credentials and normalizes email", () => {
+    expect(
+      validateLoginCredentials({
+        email: "  USER@Example.COM  ",
+        password: "securepassword",
+      }),
+    ).toEqual({
+      email: "user@example.com",
+      password: "securepassword",
+    });
+  });
+
+  it("returns null when credentials are missing", () => {
+    expect(validateLoginCredentials({ email: undefined, password: "securepassword" })).toBeNull();
+    expect(validateLoginCredentials({ email: "user@example.com", password: undefined })).toBeNull();
+  });
+
+  it("returns null for invalid email or out-of-bounds password", () => {
+    expect(validateLoginCredentials({ email: "not-an-email", password: "securepassword" })).toBeNull();
+    expect(validateLoginCredentials({ email: "user@example.com", password: "short" })).toBeNull();
+    expect(validateLoginCredentials({ email: "user@example.com", password: "a".repeat(73) })).toBeNull();
   });
 });

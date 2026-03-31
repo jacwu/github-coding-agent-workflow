@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 
 import { db } from "@/db";
 import { verifyPasswordLogin } from "./auth-service";
-import { normalizeEmail } from "./auth-validation";
+import { validateLoginCredentials } from "./auth-validation";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -15,12 +15,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = typeof credentials.email === "string" ? credentials.email : "";
-        const password = typeof credentials.password === "string" ? credentials.password : "";
+        const validatedCredentials = validateLoginCredentials({
+          email: credentials?.email,
+          password: credentials?.password,
+        });
+        if (!validatedCredentials) return null;
 
-        if (!email || !password) return null;
-
-        const user = await verifyPasswordLogin(db, normalizeEmail(email), password);
+        const user = await verifyPasswordLogin(
+          db,
+          validatedCredentials.email,
+          validatedCredentials.password,
+        );
         if (!user) return null;
 
         return {

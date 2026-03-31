@@ -78,6 +78,29 @@ describe("auth-service", () => {
       expect(row!.password_hash).toMatch(/^\$2[aby]?\$/); // bcrypt hash prefix
     });
 
+    it("normalizes email and trims name before storing", async () => {
+      const user = await createUser(db, {
+        email: "  Mixed@Example.COM  ",
+        password: "password123",
+        name: "  Mixed Name  ",
+      });
+
+      expect(user).toEqual({
+        id: expect.any(Number),
+        email: "mixed@example.com",
+        name: "Mixed Name",
+      });
+
+      const row = sqliteDb
+        .prepare("SELECT email, name FROM users WHERE id = ?")
+        .get(user.id) as { email: string; name: string } | undefined;
+
+      expect(row).toEqual({
+        email: "mixed@example.com",
+        name: "Mixed Name",
+      });
+    });
+
     it("rejects duplicate emails", async () => {
       await createUser(db, {
         email: "dup@example.com",
