@@ -28,6 +28,16 @@ interface UserWithHash extends UserWithoutHash {
 
 const SALT_ROUNDS = 10;
 
+function omitPasswordHash(user: UserWithHash): UserWithoutHash {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt,
+  };
+}
+
 export async function createUser(
   data: CreateUserInput,
   database: Database = defaultDb
@@ -86,6 +96,5 @@ export async function verifyPasswordLogin(
     return null;
   }
 
-  const { passwordHash: _passwordHash, ...userWithoutHash } = user;
-  return userWithoutHash;
+  return omitPasswordHash(user);
 }

@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { sanitizeCallbackUrl } from "@/lib/auth-utils";
+import { buildAuthPageHref, sanitizeCallbackUrl } from "@/lib/auth-utils";
 
 interface RegisterFormProps {
   callbackUrl?: string;
@@ -32,6 +32,7 @@ export default function RegisterForm({ callbackUrl }: RegisterFormProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const safeCallbackUrl = sanitizeCallbackUrl(callbackUrl);
+  const loginHref = buildAuthPageHref("/login", callbackUrl);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -76,7 +77,9 @@ export default function RegisterForm({ callbackUrl }: RegisterFormProps) {
       if (signInResult?.ok) {
         router.push(safeCallbackUrl);
       } else {
-        router.push("/login");
+        router.push(
+          buildAuthPageHref("/login", callbackUrl, { registered: "1" })
+        );
       }
     } catch {
       setError("Something went wrong. Please try again.");
@@ -146,7 +149,7 @@ export default function RegisterForm({ callbackUrl }: RegisterFormProps) {
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href={loginHref} className="text-primary hover:underline">
               Log in
             </Link>
           </p>

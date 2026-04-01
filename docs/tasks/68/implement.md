@@ -4,6 +4,12 @@
 
 Implemented the full authentication UI flow: login page, registration page, session-aware navigation bar, and the underlying auth foundation (NextAuth v5, auth service, registration API).
 
+## Revision 2026-04-01
+
+- Preserved sanitized `callbackUrl` values in the login/register cross-links so users coming from protected routes keep their intended destination.
+- Added the designed registration fallback flow: when auto-sign-in fails after a successful registration, the app redirects to `/login` with a prompt telling the user to sign in.
+- Removed the auth-service lint warning by replacing the unused password-hash destructure with a typed helper that returns the public user shape.
+
 ## Changes
 
 ### New Files
@@ -29,10 +35,10 @@ Implemented the full authentication UI flow: login page, registration page, sess
 | File | Tests |
 |---|---|
 | `src/lib/auth-service.test.ts` | 7 tests — createUser, findUserByEmail, verifyPasswordLogin |
-| `src/lib/auth-utils.test.ts` | 11 tests — sanitizeCallbackUrl edge cases |
+| `src/lib/auth-utils.test.ts` | 13 tests — sanitizeCallbackUrl edge cases plus auth-link callback propagation |
 | `src/app/api/auth/register/route.test.ts` | 7 tests — 201/400/409/500 responses |
-| `src/components/LoginForm.test.tsx` | 5 tests — rendering, signIn call, error display |
-| `src/components/RegisterForm.test.tsx` | 6 tests — rendering, API post, auto-sign-in, error display |
+| `src/components/LoginForm.test.tsx` | 7 tests — rendering, callback preservation, signIn call, error display, success prompt |
+| `src/components/RegisterForm.test.tsx` | 8 tests — rendering, callback preservation, API post, auto-sign-in, duplicate error, fallback redirect |
 | `src/components/Navbar.test.tsx` | 4 tests — logged-out links, logged-in user name, logout button |
 
 ### Modified Files
@@ -40,6 +46,11 @@ Implemented the full authentication UI flow: login page, registration page, sess
 | File | Change |
 |---|---|
 | `src/app/layout.tsx` | Added Navbar import and render above children |
+| `src/app/login/page.tsx` | Reads registration-success query state and passes a sign-in prompt into the login form |
+| `src/components/LoginForm.tsx` | Preserves callback URLs in the register link and renders optional success messaging |
+| `src/components/RegisterForm.tsx` | Preserves callback URLs in the login link and redirects to a prompted login page when auto-sign-in fails |
+| `src/lib/auth-utils.ts` | Added a shared helper for safely building auth-page hrefs with callback URLs |
+| `src/lib/auth-service.ts` | Uses a typed helper to return the public user shape without an unused-variable lint warning |
 | `.env.example` | Added `AUTH_SECRET` variable |
 | `package.json` | Added next-auth, bcryptjs, testing-library deps, jsdom |
 
@@ -56,10 +67,11 @@ Implemented the full authentication UI flow: login page, registration page, sess
 
 ## Validation
 
-- `npm run lint` — passes (2 non-blocking warnings)
+- `npm run lint` — passes
 - `AUTH_SECRET=test-secret npm run build` — passes, all 6 routes compiled
 - `npm run test` — 71 tests across 8 files, all passing
 - Manual verification — homepage, login page, and register page render correctly with navbar
+- `npm run test -- src/lib/auth-utils.test.ts src/lib/auth-service.test.ts src/components/LoginForm.test.tsx src/components/RegisterForm.test.tsx` — passes (35 tests)
 
 ## Open Items
 
