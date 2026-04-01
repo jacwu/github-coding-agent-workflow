@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { sanitizeCallbackUrl } from "./auth-utils";
+import { buildAuthPageHref, sanitizeCallbackUrl } from "./auth-utils";
 
 describe("sanitizeCallbackUrl", () => {
   it("returns the URL when it starts with /", () => {
@@ -45,5 +45,19 @@ describe("sanitizeCallbackUrl", () => {
 
   it("accepts paths with query strings", () => {
     expect(sanitizeCallbackUrl("/search?q=test")).toBe("/search?q=test");
+  });
+});
+
+describe("buildAuthPageHref", () => {
+  it("adds a sanitized callback URL to auth page links", () => {
+    expect(buildAuthPageHref("/login", "/trips")).toBe(
+      "/login?callbackUrl=%2Ftrips"
+    );
+  });
+
+  it("omits unsafe callback URLs and keeps other params", () => {
+    expect(
+      buildAuthPageHref("/login", "https://evil.com", { registered: "1" })
+    ).toBe("/login?registered=1");
   });
 });

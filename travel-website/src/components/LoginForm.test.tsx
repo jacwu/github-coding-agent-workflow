@@ -51,6 +51,12 @@ describe("LoginForm", () => {
     expect(link.getAttribute("href")).toBe("/register");
   });
 
+  it("preserves the callback URL in the register link", () => {
+    render(<LoginForm callbackUrl="/trips" />);
+    const link = screen.getByText("Register");
+    expect(link.getAttribute("href")).toBe("/register?callbackUrl=%2Ftrips");
+  });
+
   it("calls signIn on form submission", async () => {
     mockSignIn.mockResolvedValue({ ok: true });
     const user = userEvent.setup();
@@ -79,5 +85,10 @@ describe("LoginForm", () => {
     await user.click(screen.getByRole("button", { name: "Sign In" }));
 
     expect(await screen.findByText("Invalid email or password")).toBeDefined();
+  });
+
+  it("renders a success prompt when provided", () => {
+    render(<LoginForm successMessage="Account created. Please sign in." />);
+    expect(screen.getByText("Account created. Please sign in.")).toBeDefined();
   });
 });

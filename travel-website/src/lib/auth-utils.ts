@@ -17,3 +17,19 @@ export function sanitizeCallbackUrl(
   }
   return "/";
 }
+
+export function buildAuthPageHref(
+  pathname: string,
+  callbackUrl?: string,
+  params?: Record<string, string>
+): string {
+  const searchParams = new URLSearchParams(params);
+  const safeCallbackUrl = sanitizeCallbackUrl(callbackUrl);
+
+  if (safeCallbackUrl !== "/") {
+    searchParams.set("callbackUrl", safeCallbackUrl);
+  }
+
+  const query = searchParams.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}

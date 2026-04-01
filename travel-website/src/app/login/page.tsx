@@ -13,10 +13,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
   const callbackUrl =
     typeof params.callbackUrl === "string" ? params.callbackUrl : undefined;
+  const successMessage =
+    params.registered === "1" ? "Account created. Please sign in." : undefined;
 
   if (session?.user) {
     redirect(sanitizeCallbackUrl(callbackUrl));
   }
 
-  return <LoginForm callbackUrl={callbackUrl} />;
+  return (
+    <LoginForm callbackUrl={callbackUrl} successMessage={successMessage} />
+  );
 }

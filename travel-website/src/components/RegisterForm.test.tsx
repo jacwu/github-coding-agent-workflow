@@ -64,6 +64,12 @@ describe("RegisterForm", () => {
     expect(link.getAttribute("href")).toBe("/login");
   });
 
+  it("preserves the callback URL in the login link", () => {
+    render(<RegisterForm callbackUrl="/trips" />);
+    const link = screen.getByText("Log in");
+    expect(link.getAttribute("href")).toBe("/login?callbackUrl=%2Ftrips");
+  });
+
   it("shows error for short password", async () => {
     const user = userEvent.setup();
 
@@ -142,5 +148,31 @@ describe("RegisterForm", () => {
     expect(
       await screen.findByText("Email already in use")
     ).toBeDefined();
+  });
+
+  it("redirects to login with a success prompt if auto sign-in fails", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ id: 1, email: "t@example.com", name: "Test" }),
+    });
+    mockSignIn.mockResolvedValue({ ok: false });
+
+    const user = userEvent.setup();
+
+    render(<RegisterForm callbackUrl="/trips" />);
+
+    await user.type(screen.getByLabelText("Name"), "Test");
+    await user.type(screen.getByLabelText("Email"), "t@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(
+      screen.getByRole("button", { name: "Create Account" })
+    );
+
+    await vi.waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        "/login?registered=1&callbackUrl=%2Ftrips"
+      );
+    });
   });
 });

@@ -15,13 +15,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { sanitizeCallbackUrl } from "@/lib/auth-utils";
+import { buildAuthPageHref, sanitizeCallbackUrl } from "@/lib/auth-utils";
 
 interface LoginFormProps {
   callbackUrl?: string;
+  successMessage?: string;
 }
 
-export default function LoginForm({ callbackUrl }: LoginFormProps) {
+export default function LoginForm({
+  callbackUrl,
+  successMessage,
+}: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,6 +33,7 @@ export default function LoginForm({ callbackUrl }: LoginFormProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const safeCallbackUrl = sanitizeCallbackUrl(callbackUrl);
+  const registerHref = buildAuthPageHref("/register", callbackUrl);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -70,6 +75,11 @@ export default function LoginForm({ callbackUrl }: LoginFormProps) {
                 {error}
               </p>
             )}
+            {successMessage && (
+              <p className="text-sm text-primary" role="status">
+                {successMessage}
+              </p>
+            )}
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -100,7 +110,7 @@ export default function LoginForm({ callbackUrl }: LoginFormProps) {
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
+            <Link href={registerHref} className="text-primary hover:underline">
               Register
             </Link>
           </p>
