@@ -9,7 +9,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema";
 import { destinations } from "./schema";
 import { DESTINATION_SEED_DATA } from "./destination-seed-data";
-import { downloadImage, upsertDestination } from "./seed";
+import { downloadImage, ensureSeedSchema, upsertDestination } from "./seed";
 
 // ---------------------------------------------------------------------------
 // Test helper — in-memory DB with schema (mirrors schema.test.ts pattern)
@@ -184,6 +184,57 @@ describe("downloadImage", () => {
     await expect(
       downloadImage("https://example.com/missing.jpg", destPath),
     ).rejects.toThrow("HTTP 404");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ensureSeedSchema — bootstraps a fresh SQLite database
+// ---------------------------------------------------------------------------
+
+describe("ensureSeedSchema", () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "seed-schema-test-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it("applies the existing Drizzle migrations to a fresh database", () => {
+    const dbPath = path.join(tmpDir, "fresh.db");
+    const sqliteDb = new Database(dbPath);
+    sqliteDb.pragma("journal_mode = WAL");
+    sqliteDb.pragma("foreign_keys = ON");
+    const db = drizzle(sqliteDb, { schema });
+
+    try {
+      const beforeTables = sqliteDb
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all() as Array<{ name: string }>;
+
+      expect(beforeTables.map((table) => table.name)).not.toContain("destinations");
+
+      ensureSeedSchema(db);
+      ensureSeedSchema(db);
+
+      const afterTables = sqliteDb
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all() as Array<{ name: string }>;
+
+      expect(afterTables.map((table) => table.name)).toEqual(
+        expect.arrayContaining([
+          "__drizzle_migrations",
+          "users",
+          "destinations",
+          "trips",
+          "trip_stops",
+        ]),
+      );
+    } finally {
+      sqliteDb.close();
+    }
   });
 });
 

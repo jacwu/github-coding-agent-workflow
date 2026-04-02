@@ -4,6 +4,10 @@
 
 Implemented the destination seed workflow that downloads 30 destination images from Unsplash CDN into `travel-website/public/images/destinations/` and upserts the corresponding destination rows into the SQLite database. The seed process is idempotent, skipping existing images and updating DB rows on rerun.
 
+## Revision 2026-04-02
+
+Reviewed the existing implementation against the issue 69 design and found one functional gap: `npm run db:seed` failed on a fresh clone because the checked-in `travel-website/sqlite.db` file had no tables and `src/db/seed.ts` assumed the schema already existed. The revision now applies the checked-in Drizzle migrations before any image or row processing so the documented seed command works against an empty local database file.
+
 ## Files Created
 
 | File | Purpose |
@@ -27,6 +31,14 @@ Implemented the destination seed workflow that downloads 30 destination images f
 - **Seed execution**: `npm run db:seed`
   - First run: 30 images downloaded, 30 rows inserted
   - Second run: 0 images downloaded (all skipped), 30 rows updated — confirms idempotency
+- **Revision validation (2026-04-02)**:
+  - `npm run test -- src/db/seed.test.ts` — passes with 15 tests after adding a fresh-database schema bootstrap regression test
+  - `npm run db:seed` on the previously empty checked-in `sqlite.db` — succeeds with 0 images downloaded, 30 skipped, 30 rows inserted
+  - second `npm run db:seed` rerun — succeeds with 0 images downloaded, 30 skipped, 0 rows inserted, 30 rows updated
+  - `node -e "const Database=require('better-sqlite3'); ..."` verification — confirms 30 destination rows and 30 distinct stored filenames
+  - `npm run lint` — passes
+  - `AUTH_SECRET=test-secret npm run build` — passes
+  - `npm run test` — passes with 92 tests
 
 ## Key Design Decisions
 

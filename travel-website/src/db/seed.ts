@@ -18,6 +18,7 @@ import path from "path";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
 import { drizzle, BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 import * as schema from "./schema";
 import { destinations } from "./schema";
@@ -50,6 +51,16 @@ export function createSeedDb(): { db: SeedDb; sqliteDb: InstanceType<typeof Data
   sqliteDb.pragma("foreign_keys = ON");
   const db = drizzle(sqliteDb, { schema });
   return { db, sqliteDb };
+}
+
+/**
+ * Apply the existing Drizzle migrations so the seed script works against a
+ * fresh clone whose SQLite database file has not been initialized yet.
+ */
+export function ensureSeedSchema(db: SeedDb): void {
+  migrate(db, {
+    migrationsFolder: path.resolve(__dirname, "../../drizzle"),
+  });
 }
 
 /**
@@ -115,6 +126,10 @@ export function upsertDestination(db: SeedDb, entry: DestinationSeedEntry): void
  * Top-level seed orchestrator. Downloads images and upserts database rows.
  */
 export async function runSeed(): Promise<void> {
+  // Create standalone DB connection
+  const { db, sqliteDb } = createSeedDb();
+  ensureSeedSchema(db);
+
   const imagesDir = path.resolve(
     __dirname,
     "../../public/images/destinations",
@@ -122,9 +137,6 @@ export async function runSeed(): Promise<void> {
 
   // Ensure the target directory exists
   await fs.mkdir(imagesDir, { recursive: true });
-
-  // Create standalone DB connection
-  const { db, sqliteDb } = createSeedDb();
 
   let imagesDownloaded = 0;
   let imagesSkipped = 0;
