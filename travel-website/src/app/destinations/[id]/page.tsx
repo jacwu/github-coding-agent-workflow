@@ -3,13 +3,10 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { getDestinationById } from "@/lib/destination-service";
+import { formatPriceLevel } from "@/lib/format-utils";
 
 interface DestinationDetailPageProps {
   params: Promise<{ id: string }>;
-}
-
-function formatPriceLevel(level: number): string {
-  return "$".repeat(level);
 }
 
 export default async function DestinationDetailPage({

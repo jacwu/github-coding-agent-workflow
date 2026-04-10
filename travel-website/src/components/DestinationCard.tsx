@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { formatPriceLevel } from "@/lib/format-utils";
+
 interface DestinationCardProps {
   id: number;
   name: string;
@@ -9,10 +11,6 @@ interface DestinationCardProps {
   price_level: number;
   rating: number;
   image: string;
-}
-
-function formatPriceLevel(level: number): string {
-  return "$".repeat(level);
 }
 
 export default function DestinationCard({
