@@ -26,19 +26,22 @@ Add the public destination browsing UI so that:
 - changing the destination database schema or expanding the destination API contract
 - adding new backend endpoints beyond the existing destination APIs
 - implementing trip-planning actions on destination cards/detail pages
-- building a separate client-side data layer such as SWR for this browsing flow
+- building a separate client-side data layer such as SWR for this browsing flow; the `DestinationFilters` client component is for URL manipulation only, not data fetching
 - solving missing local image assets as part of this task; visual validation assumes destination images are available in the database/public asset path
+- adding season-based filtering: US-2.3 mentions "season" as a filter dimension, but the existing destination API and service layer do not support filtering by `best_season`; extending the API is out of scope for this task
 
 ## Current State
 
 Verified against the current repository:
 
-- `travel-website/src/lib/destination-service.ts` already exposes `listDestinations`, `getDestinationById`, and `isValidSort`.
+- `travel-website/src/lib/destination-service.ts` already exposes `listDestinations`, `getDestinationById`, and `isValidSort`. The file starts with `import "server-only"`, which is compatible with server component usage but prevents import from client components or test files without mocking.
+- `ListDestinationsParams` and `isValidSort` are already exported from `destination-service.ts` and can be reused directly by the shared query parsing helper.
+- The `listDestinations` service returns list items with shape `{ id, name, country, category, price_level, rating, image }` — note that `description`, `region`, and `best_season` are **not** included in list results. `getDestinationById` returns the full detail shape including all fields.
 - `travel-website/src/app/api/destinations/route.ts` and `travel-website/src/app/api/destinations/[id]/route.ts` already implement the public list/detail API surface, including validation, sorting, filtering, and pagination.
 - `travel-website/src/app/` currently has no `destinations/` directory, so there is no destination list page, detail page, loading state, or route-specific not-found UI.
-- `travel-website/src/app/page.tsx` is still a placeholder landing card instead of the `/ -> /destinations` redirect described in `docs/design.md`.
-- `travel-website/src/components/` currently contains auth and navbar components plus base UI primitives; there is no destination card, filter bar, or detail-page presentation component yet.
-- `travel-website/src/app/globals.css` already provides the color tokens and reusable `.glass` utility needed for a light, airy visual treatment.
+- `travel-website/src/app/page.tsx` is still a placeholder landing card instead of the `/ → /destinations` redirect described in `docs/design.md`.
+- `travel-website/src/components/` currently contains auth and navbar components (`Navbar.tsx`, `LoginForm.tsx`, `RegisterForm.tsx`) plus shadcn/ui primitives (`ui/button.tsx`, `ui/card.tsx`, `ui/input.tsx`, `ui/label.tsx`); there is no destination card, filter bar, or detail-page presentation component yet.
+- `travel-website/src/app/globals.css` already provides the Ocean Teal color tokens, radius variables (up to `--radius-4xl`), and the reusable `.glass` utility needed for a light, airy visual treatment.
 - `travel-website/public/images/destinations/` currently contains only `.gitkeep` in this branch, so implementation should rely on the existing `image` field contract, but end-to-end visual verification will require seeded image files to exist locally.
 
 ## Proposed Design
@@ -51,11 +54,12 @@ Add the public App Router pages reserved in `docs/design.md`:
 |---|---|---|
 | `travel-website/src/app/destinations/page.tsx` | `/destinations` | Server-rendered list page driven by URL search params |
 | `travel-website/src/app/destinations/[id]/page.tsx` | `/destinations/:id` | Server-rendered destination detail page |
+| `travel-website/src/app/destinations/[id]/not-found.tsx` | `/destinations/:id` segment | Custom 404 page for non-existent destination ids |
 | `travel-website/src/app/destinations/loading.tsx` | `/destinations` segment | Lightweight skeleton/loading state for filter and page transitions |
 
 Additionally, update `travel-website/src/app/page.tsx` to redirect to `/destinations` so the browsing experience becomes the default public entry point, matching `docs/design.md`.
 
-For the detail route, invalid ids or missing destinations should call `notFound()` rather than reproducing API-style JSON errors in the browser UI.
+For the detail route, invalid ids (non-integer, < 1) or missing destinations should call `notFound()` from `next/navigation` to render the `not-found.tsx` boundary. The custom `not-found.tsx` should include a friendly message, the destination name context if available, and a link back to `/destinations`.
 
 ### 2. Data flow: server-rendered pages, URL-driven controls
 
@@ -75,19 +79,21 @@ This keeps:
 
 The current list API route already contains parsing and validation for `page`, `limit`, `sort`, `price_min`, and `price_max`. The page implementation will need the same rules for consistent behavior.
 
-To avoid duplicated validation logic, extract the destination browse query parsing into a small shared helper module, for example:
+To avoid duplicated validation logic, extract the destination browse query parsing into a small shared helper module:
 
 - `travel-website/src/lib/destination-query-params.ts`
 
 Responsibilities:
 
-- accept raw `searchParams`
+- accept raw `searchParams` (a `Record<string, string | string[] | undefined>` or `URLSearchParams`)
 - normalize browser-facing query keys (`q`, `region`, `category`, `price_min`, `price_max`, `sort`, `page`, `limit`)
 - apply the same defaults and validation rules already enforced by the API route
-- return a typed object that can be passed to `listDestinations`
-- return sanitized UI state values for keeping form controls in sync with the URL
+- reuse the already-exported `isValidSort` from `destination-service.ts` and return a typed `ListDestinationsParams` object that can be passed directly to `listDestinations`
+- return sanitized UI state values for keeping form controls in sync with the URL (e.g., the raw string values before coercion, so select controls can reflect the current selection)
 
-For the page UX, invalid query values should degrade to safe defaults instead of rendering a hard error page. The API should keep its current `400` behavior; the page should prioritize recoverable browsing.
+For the page UX, invalid query values should degrade to safe defaults instead of rendering a hard error page. The API route should keep its current `400` behavior; the page should prioritize recoverable browsing. Both consumers can call the same parsing function but handle invalid results differently.
+
+After introducing this helper, refactor the existing API route (`travel-website/src/app/api/destinations/route.ts`) to use the shared parsing logic, preserving its existing 400 error responses for invalid values.
 
 ### 4. Destination list page composition
 
@@ -117,28 +123,39 @@ The list page should expose the filters already supported by the API/service:
 - price range (`price_min`, `price_max`)
 - sort (`rating`, `price`, `popularity`)
 
+**Filter option values**: Region and category dropdowns should use hard-coded option lists matching the known schema values:
+- **Regions**: Asia, Europe, North America, South America, Africa, Oceania
+- **Categories**: beach, mountain, city, countryside
+- **Price levels**: 1–5 (displayed as `$` through `$$$$$` or numeric labels)
+
+These values align with the seeded destination data and the existing API filtering behavior.
+
 Recommended interaction model:
 
-- search input with an explicit submit action
-- select-style controls for region/category/sort
-- select inputs for min/max price levels `1-5`
-- a reset/clear action that removes all non-pagination params
+- search input with an explicit submit action (form submit or search button)
+- `<select>` elements for region, category, and sort
+- `<select>` elements for min/max price levels 1–5
+- a reset/clear button that removes all non-pagination params by navigating to `/destinations`
 - whenever search/filter/sort changes, reset `page` back to `1`
 
-This can be implemented as a client component using `useRouter`, `usePathname`, and `useSearchParams`, while the page data itself remains server-rendered.
+This should be implemented as a client component (`"use client"`) using `useRouter`, `usePathname`, and `useSearchParams` from `next/navigation`. The form builds a new URL query string and calls `router.push()` to trigger a server re-render, keeping the page data itself server-rendered.
+
+Use the existing shadcn/ui `Input` and `Label` components for the search field. Plain HTML `<select>` elements are sufficient for dropdowns; avoid introducing additional UI library dependencies for this task.
 
 #### 4c. Card design
 
-`DestinationCard` should emphasize imagery and whitespace:
+`DestinationCard` should be a presentational component emphasizing imagery and whitespace:
 
-- use `next/image` with a wide aspect ratio image block
-- rounded-3xl outer card treatment
-- soft base shadow plus hover transition such as `hover:-translate-y-1 hover:shadow-xl`
-- lightweight metadata chips or inline labels for category, country, rating, and price level
-- concise description excerpt only if it improves scanning; otherwise prioritize a cleaner card with title + metadata
-- entire card should link to `/destinations/[id]`
+- use `next/image` with `fill` mode inside a fixed-aspect-ratio container (e.g., `aspect-[4/3]` or `aspect-video`) so images render consistently regardless of source dimensions
+- `rounded-3xl` outer card with `overflow-hidden` to clip the image
+- soft base shadow (`shadow-sm`) plus hover transition: `hover:-translate-y-1 hover:shadow-xl transition-all duration-300`
+- lightweight metadata: category badge, country, rating (as text, e.g., "★ 4.7"), and price level (e.g., "$$$")
+- do **not** render a description excerpt on the card — the list API response does not include `description`, and the card design should stay clean with title + metadata only
+- entire card should be a clickable `next/link` to `/destinations/[id]`
 
 The hover effect should feel like a soft lift, not a sharp border change.
+
+Since this is a shared presentational component, it should accept a typed props interface matching the list item shape (`id`, `name`, `country`, `category`, `price_level`, `rating`, `image`). Use `next/image` with `sizes` attribute for responsive optimization (e.g., `"(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"`).
 
 #### 4d. Empty and paging states
 
@@ -160,10 +177,10 @@ Pagination should remain URL-based and can stay intentionally simple:
 
 Recommended structure:
 
-1. **Hero image area** — large responsive image with overlaid title, country, and category/rating chips
-2. **Primary content section** — description and supporting narrative
-3. **Metadata panel** — best season, region, price level, coordinates, and any additional destination facts already available from the existing schema
-4. **Navigation affordance** — link back to the destination list while preserving the visitor's browsing context when possible
+1. **Hero image area** — large responsive `next/image` with `fill` mode in a tall aspect-ratio container, with overlaid title, country, and category/rating chips using the `.glass` utility for contrast
+2. **Primary content section** — description and supporting narrative (only rendered when `description` is non-null)
+3. **Metadata panel** — best season, region, price level, coordinates, and any additional destination facts already available from the existing schema; each subsection is omitted when its source field is null
+4. **Navigation affordance** — "← Back to Destinations" link pointing to `/destinations`; the link uses a plain href rather than attempting to reconstruct the visitor's previous filter state, keeping implementation simple
 
 Data mapping should use the existing destination detail response shape from `getDestinationById`, including:
 
@@ -180,6 +197,8 @@ Data mapping should use the existing destination detail response shape from `get
 - `image`
 
 If optional fields such as `description`, `best_season`, `latitude`, or `longitude` are null, the UI should omit that subsection instead of rendering empty labels.
+
+For `next/image` on the detail hero, use `fill` with `priority` prop for above-the-fold LCP optimization. Set appropriate `sizes` (e.g., `"100vw"` for full-width hero).
 
 ### 6. Styling rules for the "Light Visual Style"
 
@@ -208,36 +227,54 @@ The pages should feel image-led and breathable before they feel data-dense.
 
 Follow the existing Vitest + Testing Library patterns used for current UI components.
 
+**Mocking conventions** (match existing test files):
+
+- Mock `server-only` with `vi.mock("server-only", () => ({}))` when importing from modules that use it (e.g., `destination-service.ts`)
+- Mock `next/link` to render a plain `<a>` tag (same as `Navbar.test.tsx`)
+- Mock `next/navigation` hooks (`useRouter`, `usePathname`, `useSearchParams`) for client component tests (same as `LoginForm.test.tsx`)
+- Mock `@base-ui/react/button` or `@/components/ui/button` to avoid duplicate DOM nodes in jsdom (same as `LoginForm.test.tsx` / `Navbar.test.tsx`)
+- Mock `next/image` to render a plain `<img>` tag (new for this task, since `next/image` does not render in jsdom)
+- Use `cleanup()` in `afterEach` for all component tests
+- Client component tests: `render(<Component />)` directly
+- Server async component tests: `const Component = await ServerComponent(); render(Component);`
+
 Recommended coverage:
 
 #### Component tests
 
 - `travel-website/src/components/DestinationCard.test.tsx`
-  - renders title, image alt text, metadata, and correct detail link
-  - gracefully omits optional content that is not passed in
+  - renders title, image alt text, metadata (country, category, rating, price level), and correct detail link href
+  - applies the expected card styling classes (rounded, shadow, hover transition)
 
 - `travel-website/src/components/DestinationFilters.test.tsx`
-  - initializes controls from current URL params
-  - writes updated query strings on submit/change
+  - initializes controls from current URL params (mocked `useSearchParams`)
+  - writes updated query strings via `router.push()` on form submit
   - resets `page` to `1` when filters change
-  - clears filters back to the unfiltered list state
-
-As with existing component tests, mock `next/link`, `next/navigation`, and any Base UI primitives as needed for stable jsdom behavior.
+  - clears all filters when reset button is clicked (navigates to `/destinations`)
+  - preserves existing filter values when only one filter changes
 
 #### Query-param helper tests
 
-- unit tests for the shared normalization helper covering defaults, clamping, invalid values, and URL-state round-tripping
+- `travel-website/src/lib/destination-query-params.test.ts`
+  - returns correct defaults when no params are provided
+  - parses valid `page`, `limit`, `sort`, `price_min`, `price_max` values
+  - degrades invalid values to safe defaults (non-integer page, out-of-range price, unknown sort)
+  - clamps `limit` to maximum of 100
+  - validates `price_min <= price_max` constraint
+  - preserves string params (`q`, `region`, `category`) as-is
 
 #### Route/page behavior checks
 
-- targeted tests for any page-level pure helpers introduced for pagination state or query serialization
 - manual verification that `/`, `/destinations`, and `/destinations/[id]` render correctly with seeded destination data
+- manual verification that `/destinations/99999` renders the custom not-found page
 
 ## Implementation Plan
 
-1. **Create shared destination query parsing** so the list page and existing API route use the same parameter defaults and validation rules.
-2. **Build the destination list UI** by adding `/destinations/page.tsx`, `DestinationFilters`, and `DestinationCard`, wired to `listDestinations`.
-3. **Build the destination detail UI** by adding `/destinations/[id]/page.tsx` and rendering the full destination payload from `getDestinationById`.
-4. **Update the default entry route** by changing `/` to redirect to `/destinations`.
-5. **Add focused tests** for destination card rendering, filter URL interactions, and shared query normalization.
-6. **Validate manually with seeded data/images** to confirm imagery, hover elevation, empty states, and URL-driven browsing behavior.
+1. **Create shared destination query parsing** (`destination-query-params.ts` + `destination-query-params.test.ts`) — extract parsing/validation logic reusable by both the list page and the existing API route; reuse `isValidSort` and `ListDestinationsParams` from `destination-service.ts`. Write unit tests first (TDD).
+2. **Refactor the existing API route** (`api/destinations/route.ts`) to use the shared parsing helper, preserving its existing 400 error responses. Verify existing destination service tests still pass.
+3. **Build `DestinationCard` component** with `next/image`, hover elevation, and metadata display. Write component tests first (TDD).
+4. **Build `DestinationFilters` client component** with search/filter/sort controls and URL-driven state. Write component tests first (TDD).
+5. **Build the destination list page** (`/destinations/page.tsx` + `loading.tsx`) — compose filters, card grid, pagination, and empty state using `listDestinations` and the shared query params helper.
+6. **Build the destination detail page** (`/destinations/[id]/page.tsx` + `not-found.tsx`) — render full destination payload from `getDestinationById` with hero image, metadata, and back navigation.
+7. **Update the default entry route** — change `page.tsx` to use `redirect("/destinations")` from `next/navigation`.
+8. **Validate manually with seeded data/images** — confirm imagery, hover elevation, empty states, not-found page, and URL-driven browsing behavior end to end.
