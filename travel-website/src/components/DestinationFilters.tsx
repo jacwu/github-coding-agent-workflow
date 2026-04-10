@@ -68,9 +68,9 @@ export default function DestinationFilters() {
 
   return (
     <div className="glass rounded-3xl p-6">
-      <form onSubmit={handleSearchSubmit} className="mb-4 flex gap-3">
+      <form onSubmit={handleSearchSubmit} className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <Label htmlFor="search-input" className="sr-only">
+          <Label htmlFor="search-input" className="mb-2 inline-block">
             Search destinations
           </Label>
           <Input
@@ -84,7 +84,7 @@ export default function DestinationFilters() {
         </div>
         <button
           type="submit"
-          className="rounded-xl bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           Search
         </button>
