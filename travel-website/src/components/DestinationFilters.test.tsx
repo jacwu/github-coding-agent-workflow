@@ -40,6 +40,14 @@ describe("DestinationFilters", () => {
     expect(screen.getByPlaceholderText("Search destinations...")).toBeDefined();
   });
 
+  it("renders a visible search label", () => {
+    render(<DestinationFilters />);
+
+    const label = screen.getByText("Search destinations");
+    expect(label).toBeDefined();
+    expect(label.className).not.toContain("sr-only");
+  });
+
   it("renders region select", () => {
     render(<DestinationFilters />);
     expect(screen.getByLabelText("Region")).toBeDefined();

@@ -4,7 +4,15 @@ import type { ListDestinationsParams } from "@/lib/destination-service";
 
 type RawSearchParams = Record<string, string | string[] | undefined>;
 
-function getString(params: RawSearchParams, key: string): string | undefined {
+type DestinationSearchParams = RawSearchParams | URLSearchParams;
+
+function getString(
+  params: DestinationSearchParams,
+  key: string,
+): string | undefined {
+  if (params instanceof URLSearchParams) {
+    return params.get(key) ?? undefined;
+  }
   const value = params[key];
   if (Array.isArray(value)) {
     return value[0];
@@ -49,7 +57,7 @@ export interface ParsedDestinationQuery {
 }
 
 export function parseDestinationSearchParams(
-  searchParams: RawSearchParams,
+  searchParams: DestinationSearchParams,
 ): ParsedDestinationQuery {
   const rawQ = getString(searchParams, "q") ?? "";
   const rawRegion = getString(searchParams, "region") ?? "";

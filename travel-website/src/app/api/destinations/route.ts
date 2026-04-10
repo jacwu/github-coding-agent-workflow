@@ -69,11 +69,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     // Delegate to shared parsing for normalization
-    const rawParams: Record<string, string | undefined> = {};
-    for (const [key, value] of searchParams.entries()) {
-      rawParams[key] = value;
-    }
-    const { params } = parseDestinationSearchParams(rawParams);
+    const { params } = parseDestinationSearchParams(searchParams);
 
     const result = await listDestinations(params);
 

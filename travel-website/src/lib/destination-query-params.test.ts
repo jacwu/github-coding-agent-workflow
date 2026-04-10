@@ -121,6 +121,24 @@ describe("parseDestinationSearchParams", () => {
     expect(result.params.page).toBe(2);
   });
 
+  it("accepts URLSearchParams input", () => {
+    const result = parseDestinationSearchParams(
+      new URLSearchParams({
+        q: "beach",
+        region: "Asia",
+        page: "2",
+        limit: "24",
+      }),
+    );
+
+    expect(result.params).toMatchObject({
+      q: "beach",
+      region: "Asia",
+      page: 2,
+      limit: 24,
+    });
+  });
+
   it("handles empty string values as undefined params", () => {
     const result = parseDestinationSearchParams({
       q: "",
