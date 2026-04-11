@@ -1,3 +1,4 @@
 export function formatPriceLevel(level: number): string {
-  return "$".repeat(level);
+  const safeLevel = Math.max(0, Math.min(5, Math.floor(level)));
+  return "$".repeat(safeLevel);
 }
