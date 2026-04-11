@@ -124,6 +124,60 @@ describe("DestinationFilters", () => {
     expect(mockPush).toHaveBeenCalledWith("/destinations");
   });
 
+  it("clears price_max when price_min is set above current price_max", async () => {
+    mockSearchParams.set("price_max", "2");
+
+    const user = userEvent.setup();
+    render(<DestinationFilters />);
+
+    await user.selectOptions(screen.getByLabelText("Min Price"), "4");
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const calledUrl = mockPush.mock.calls[0][0] as string;
+    expect(calledUrl).toContain("price_min=4");
+    expect(calledUrl).not.toContain("price_max=");
+  });
+
+  it("clears price_min when price_max is set below current price_min", async () => {
+    mockSearchParams.set("price_min", "4");
+
+    const user = userEvent.setup();
+    render(<DestinationFilters />);
+
+    await user.selectOptions(screen.getByLabelText("Max Price"), "2");
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const calledUrl = mockPush.mock.calls[0][0] as string;
+    expect(calledUrl).toContain("price_max=2");
+    expect(calledUrl).not.toContain("price_min=");
+  });
+
+  it("keeps both price params when price_min equals price_max", async () => {
+    mockSearchParams.set("price_max", "3");
+
+    const user = userEvent.setup();
+    render(<DestinationFilters />);
+
+    await user.selectOptions(screen.getByLabelText("Min Price"), "3");
+
+    const calledUrl = mockPush.mock.calls[0][0] as string;
+    expect(calledUrl).toContain("price_min=3");
+    expect(calledUrl).toContain("price_max=3");
+  });
+
+  it("keeps both price params when price_min is below price_max", async () => {
+    mockSearchParams.set("price_max", "4");
+
+    const user = userEvent.setup();
+    render(<DestinationFilters />);
+
+    await user.selectOptions(screen.getByLabelText("Min Price"), "2");
+
+    const calledUrl = mockPush.mock.calls[0][0] as string;
+    expect(calledUrl).toContain("price_min=2");
+    expect(calledUrl).toContain("price_max=4");
+  });
+
   it("preserves existing filter values when only one filter changes", async () => {
     mockSearchParams.set("q", "resort");
     mockSearchParams.set("region", "Europe");

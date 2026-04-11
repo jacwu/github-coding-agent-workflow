@@ -62,6 +62,21 @@ export default function DestinationFilters() {
     router.push(buildUrl({ [key]: value }));
   };
 
+  const handlePriceChange = (key: "price_min" | "price_max", value: string) => {
+    const updates: Record<string, string> = { [key]: value };
+
+    if (value) {
+      const newLevel = Number(value);
+      if (key === "price_min" && currentPriceMax && newLevel > Number(currentPriceMax)) {
+        updates["price_max"] = "";
+      } else if (key === "price_max" && currentPriceMin && newLevel < Number(currentPriceMin)) {
+        updates["price_min"] = "";
+      }
+    }
+
+    router.push(buildUrl(updates));
+  };
+
   const handleReset = () => {
     router.push("/destinations");
   };
@@ -130,7 +145,7 @@ export default function DestinationFilters() {
           <select
             id="price-min-select"
             value={currentPriceMin}
-            onChange={(e) => handleSelectChange("price_min", e.target.value)}
+            onChange={(e) => handlePriceChange("price_min", e.target.value)}
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
           >
             <option value="">Any</option>
@@ -147,7 +162,7 @@ export default function DestinationFilters() {
           <select
             id="price-max-select"
             value={currentPriceMax}
-            onChange={(e) => handleSelectChange("price_max", e.target.value)}
+            onChange={(e) => handlePriceChange("price_max", e.target.value)}
             className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
           >
             <option value="">Any</option>
