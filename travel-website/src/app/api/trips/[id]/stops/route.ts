@@ -1,42 +1,27 @@
 import { NextResponse } from "next/server";
-import type { Session } from "next-auth";
 
-import { auth } from "@/lib/auth";
 import {
   addTripStop,
   reorderTripStops,
   DestinationNotFoundError,
 } from "@/lib/trip-service";
 
+import { getAuthenticatedUserId, parsePositiveInt } from "../../_helpers";
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function getAuthenticatedUserId(session: Session | null): number | null {
-  const raw = session?.user?.id;
-  if (!raw) return null;
-  const num = Number(raw);
-  if (!Number.isInteger(num) || num < 1) return null;
-  return num;
-}
-
-function parseTripId(idParam: string): number | null {
-  const num = Number(idParam);
-  if (!Number.isInteger(num) || num < 1) return null;
-  return num;
-}
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   try {
-    const session = (await auth()) as Session | null;
-    const userId = getAuthenticatedUserId(session);
+    const userId = await getAuthenticatedUserId();
     if (userId === null) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: idParam } = await params;
-    const tripId = parseTripId(idParam);
+    const tripId = parsePositiveInt(idParam);
     if (tripId === null) {
       return NextResponse.json(
         { error: "Invalid trip id" },
@@ -154,14 +139,13 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   try {
-    const session = (await auth()) as Session | null;
-    const userId = getAuthenticatedUserId(session);
+    const userId = await getAuthenticatedUserId();
     if (userId === null) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: idParam } = await params;
-    const tripId = parseTripId(idParam);
+    const tripId = parsePositiveInt(idParam);
     if (tripId === null) {
       return NextResponse.json(
         { error: "Invalid trip id" },

@@ -10,16 +10,20 @@ vi.mock("@/lib/trip-service", () => ({
   deleteTripStop: vi.fn(),
 }));
 
-const { auth } = await import("@/lib/auth");
+const mockGetAuthUserId = vi.fn<() => Promise<number | null>>();
+vi.mock("../../../_helpers", () => ({
+  getAuthenticatedUserId: (...args: unknown[]) => mockGetAuthUserId(...(args as [])),
+  parsePositiveInt: (value: string) => {
+    const num = Number(value);
+    if (!Number.isInteger(num) || num < 1) return null;
+    return num;
+  },
+}));
+
 const { deleteTripStop } = await import("@/lib/trip-service");
 const { DELETE: DEL } = await import("./route");
 
-const mockAuth = vi.mocked(auth);
 const mockDeleteStop = vi.mocked(deleteTripStop);
-
-function makeSession(userId: string) {
-  return { user: { id: userId, email: "a@b.com", name: "A" }, expires: "" };
-}
 
 const sampleTrip = {
   id: 1,
@@ -46,13 +50,13 @@ describe("DELETE /api/trips/:id/stops/:stopId", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetAuthUserId.mockResolvedValue(null);
     const res = await callDELETE("1", "1");
     expect(res.status).toBe(401);
   });
 
   it("returns 400 for invalid trip id", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const res = await callDELETE("abc", "1");
     expect(res.status).toBe(400);
     const data = await res.json();
@@ -60,7 +64,7 @@ describe("DELETE /api/trips/:id/stops/:stopId", () => {
   });
 
   it("returns 400 for invalid stop id", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const res = await callDELETE("1", "xyz");
     expect(res.status).toBe(400);
     const data = await res.json();
@@ -68,14 +72,14 @@ describe("DELETE /api/trips/:id/stops/:stopId", () => {
   });
 
   it("returns 404 when trip or stop not found", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     mockDeleteStop.mockResolvedValue(null);
     const res = await callDELETE("1", "1");
     expect(res.status).toBe(404);
   });
 
   it("returns 200 with updated trip on success", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     mockDeleteStop.mockResolvedValue(sampleTrip);
     const res = await callDELETE("1", "1");
     expect(res.status).toBe(200);
@@ -84,7 +88,7 @@ describe("DELETE /api/trips/:id/stops/:stopId", () => {
   });
 
   it("returns 500 on unexpected error", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     mockDeleteStop.mockRejectedValue(new Error("DB error"));
     const res = await callDELETE("1", "1");
     expect(res.status).toBe(500);

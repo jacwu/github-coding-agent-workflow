@@ -11,17 +11,21 @@ vi.mock("@/lib/trip-service", () => ({
   createTrip: vi.fn(),
 }));
 
-const { auth } = await import("@/lib/auth");
+const mockGetAuthUserId = vi.fn<() => Promise<number | null>>();
+vi.mock("./_helpers", () => ({
+  getAuthenticatedUserId: (...args: unknown[]) => mockGetAuthUserId(...(args as [])),
+  parsePositiveInt: (value: string) => {
+    const num = Number(value);
+    if (!Number.isInteger(num) || num < 1) return null;
+    return num;
+  },
+}));
+
 const { listTripsForUser, createTrip } = await import("@/lib/trip-service");
 const { GET, POST } = await import("./route");
 
-const mockAuth = vi.mocked(auth);
 const mockListTrips = vi.mocked(listTripsForUser);
 const mockCreateTrip = vi.mocked(createTrip);
-
-function makeSession(userId: string) {
-  return { user: { id: userId, email: "a@b.com", name: "A" }, expires: "" };
-}
 
 function makePostRequest(body: unknown): Request {
   return new Request("http://localhost/api/trips", {
@@ -37,19 +41,13 @@ describe("GET /api/trips", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockAuth.mockResolvedValue(null);
-    const res = await GET();
-    expect(res.status).toBe(401);
-  });
-
-  it("returns 401 when session has no user id", async () => {
-    mockAuth.mockResolvedValue({ user: {}, expires: "" } as ReturnType<typeof auth> extends Promise<infer T> ? T : never);
+    mockGetAuthUserId.mockResolvedValue(null);
     const res = await GET();
     expect(res.status).toBe(401);
   });
 
   it("returns 200 with trips list", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const trips = [
       { id: 1, title: "Trip 1", start_date: null, end_date: null, status: "draft", created_at: "2026-01-01 00:00:00", updated_at: "2026-01-01 00:00:00" },
     ];
@@ -63,7 +61,7 @@ describe("GET /api/trips", () => {
   });
 
   it("returns 500 on unexpected error", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     mockListTrips.mockRejectedValue(new Error("DB error"));
 
     const res = await GET();
@@ -79,13 +77,13 @@ describe("POST /api/trips", () => {
   });
 
   it("returns 401 when not authenticated", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetAuthUserId.mockResolvedValue(null);
     const res = await POST(makePostRequest({ title: "T" }));
     expect(res.status).toBe(401);
   });
 
   it("returns 400 when title is missing", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const res = await POST(makePostRequest({}));
     expect(res.status).toBe(400);
     const data = await res.json();
@@ -93,13 +91,13 @@ describe("POST /api/trips", () => {
   });
 
   it("returns 400 when title is empty string", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const res = await POST(makePostRequest({ title: "   " }));
     expect(res.status).toBe(400);
   });
 
   it("returns 400 for invalid start_date format", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const res = await POST(makePostRequest({ title: "T", start_date: "not-a-date" }));
     expect(res.status).toBe(400);
     const data = await res.json();
@@ -107,13 +105,13 @@ describe("POST /api/trips", () => {
   });
 
   it("returns 400 for invalid end_date format", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const res = await POST(makePostRequest({ title: "T", end_date: "bad" }));
     expect(res.status).toBe(400);
   });
 
   it("returns 400 when start_date > end_date", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const res = await POST(
       makePostRequest({ title: "T", start_date: "2026-08-01", end_date: "2026-07-01" }),
     );
@@ -123,7 +121,7 @@ describe("POST /api/trips", () => {
   });
 
   it("returns 201 with created trip", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     const created = {
       id: 1,
       title: "My Trip",
@@ -146,7 +144,7 @@ describe("POST /api/trips", () => {
   });
 
   it("returns 500 on unexpected error", async () => {
-    mockAuth.mockResolvedValue(makeSession("1") as Awaited<ReturnType<typeof auth>>);
+    mockGetAuthUserId.mockResolvedValue(1);
     mockCreateTrip.mockRejectedValue(new Error("DB error"));
 
     const res = await POST(makePostRequest({ title: "T" }));

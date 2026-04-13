@@ -1,26 +1,17 @@
 import { NextResponse } from "next/server";
-import type { Session } from "next-auth";
 
-import { auth } from "@/lib/auth";
 import {
   listTripsForUser,
   createTrip,
 } from "@/lib/trip-service";
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { getAuthenticatedUserId } from "./_helpers";
 
-function getAuthenticatedUserId(session: Session | null): number | null {
-  const raw = session?.user?.id;
-  if (!raw) return null;
-  const num = Number(raw);
-  if (!Number.isInteger(num) || num < 1) return null;
-  return num;
-}
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(): Promise<NextResponse> {
   try {
-    const session = (await auth()) as Session | null;
-    const userId = getAuthenticatedUserId(session);
+    const userId = await getAuthenticatedUserId();
     if (userId === null) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -37,8 +28,7 @@ export async function GET(): Promise<NextResponse> {
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const session = (await auth()) as Session | null;
-    const userId = getAuthenticatedUserId(session);
+    const userId = await getAuthenticatedUserId();
     if (userId === null) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

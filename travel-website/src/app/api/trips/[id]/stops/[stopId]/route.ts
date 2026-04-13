@@ -1,30 +1,15 @@
 import { NextResponse } from "next/server";
-import type { Session } from "next-auth";
 
-import { auth } from "@/lib/auth";
 import { deleteTripStop } from "@/lib/trip-service";
 
-function getAuthenticatedUserId(session: Session | null): number | null {
-  const raw = session?.user?.id;
-  if (!raw) return null;
-  const num = Number(raw);
-  if (!Number.isInteger(num) || num < 1) return null;
-  return num;
-}
-
-function parsePositiveInt(value: string): number | null {
-  const num = Number(value);
-  if (!Number.isInteger(num) || num < 1) return null;
-  return num;
-}
+import { getAuthenticatedUserId, parsePositiveInt } from "../../../_helpers";
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string; stopId: string }> },
 ): Promise<NextResponse> {
   try {
-    const session = (await auth()) as Session | null;
-    const userId = getAuthenticatedUserId(session);
+    const userId = await getAuthenticatedUserId();
     if (userId === null) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
