@@ -386,11 +386,10 @@ export async function reorderTripStops(
     );
   }
 
+  const inputSortOrders = new Set(input.stops.map((stop) => stop.sort_order));
+
   for (let expectedSortOrder = 1; expectedSortOrder <= input.stops.length; expectedSortOrder += 1) {
-    const hasExpectedSortOrder = input.stops.some(
-      (stop) => stop.sort_order === expectedSortOrder,
-    );
-    if (!hasExpectedSortOrder) {
+    if (!inputSortOrders.has(expectedSortOrder)) {
       throw new TripStopReorderError(
         `sort_order values must be contiguous from 1 to ${input.stops.length}`,
       );

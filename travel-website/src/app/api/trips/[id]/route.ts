@@ -151,29 +151,35 @@ export async function PUT(
       );
     }
 
-    const existingTrip = await getTripByIdForUser(tripId, userId);
-    if (!existingTrip) {
-      return NextResponse.json(
-        { error: "Trip not found" },
-        { status: 404 },
-      );
-    }
+    const needsExistingTripForDateValidation =
+      (start_date !== undefined && end_date === undefined) ||
+      (start_date === undefined && end_date !== undefined);
 
-    // Date consistency: resolve effective start/end
-    const effectiveStart =
-      start_date !== undefined
-        ? (start_date as string | null)
-        : existingTrip.start_date;
-    const effectiveEnd =
-      end_date !== undefined
-        ? (end_date as string | null)
-        : existingTrip.end_date;
+    if (needsExistingTripForDateValidation) {
+      const existingTrip = await getTripByIdForUser(tripId, userId);
+      if (!existingTrip) {
+        return NextResponse.json(
+          { error: "Trip not found" },
+          { status: 404 },
+        );
+      }
 
-    if (effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
-      return NextResponse.json(
-        { error: "start_date must not be after end_date" },
-        { status: 400 },
-      );
+      // Date consistency: resolve effective start/end
+      const effectiveStart =
+        start_date !== undefined
+          ? (start_date as string | null)
+          : existingTrip.start_date;
+      const effectiveEnd =
+        end_date !== undefined
+          ? (end_date as string | null)
+          : existingTrip.end_date;
+
+      if (effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
+        return NextResponse.json(
+          { error: "start_date must not be after end_date" },
+          { status: 400 },
+        );
+      }
     }
 
     const updated = await updateTripForUser(
@@ -181,8 +187,10 @@ export async function PUT(
       userId,
       {
         title: title !== undefined ? (title as string).trim() : undefined,
-        start_date: effectiveStart,
-        end_date: effectiveEnd,
+        start_date:
+          start_date !== undefined ? (start_date as string | null) : undefined,
+        end_date:
+          end_date !== undefined ? (end_date as string | null) : undefined,
         status: status as string | undefined,
       },
     );
