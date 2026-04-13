@@ -17,7 +17,7 @@
 
 ### Remaining Items
 
-- None.
+- `parallel_validation` code review passed, but the CodeQL scan reported `Analysis failed` twice without any security alerts. Local lint/build/test validation passed.
 
 ## Changes
 
