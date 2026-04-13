@@ -1,5 +1,24 @@
 # Issue 72 – Implement Trip Management APIs – Implementation Summary
 
+## Revision Summary (2026-04-13)
+
+- Tightened `PUT /api/trips/:id` validation to reject unknown body fields and to validate partial date updates against the existing persisted trip dates before applying an update.
+- Tightened stop reorder validation in both `PUT /api/trips/:id/stops` and `trip-service.ts` so `sort_order` values must form a contiguous `1..n` sequence instead of merely being unique positive integers.
+- Added focused regression tests for the new validation paths in the trip update route, stop reorder route, and trip service.
+
+### Revision Validation
+
+| Command | Result |
+|---|---|
+| `npm run test -- src/lib/trip-service.test.ts src/app/api/trips/route.test.ts src/app/api/trips/[id]/route.test.ts src/app/api/trips/[id]/stops/route.test.ts src/app/api/trips/[id]/stops/[stopId]/route.test.ts` | Passed (87 tests) |
+| `npm run lint` | Passed with 2 pre-existing warnings in `src/components/DestinationCard.test.tsx` (`<img>`/missing `alt`) |
+| `AUTH_SECRET=test-secret npm run build` | Passed |
+| `npm run test` | Passed (265 tests) |
+
+### Remaining Items
+
+- `parallel_validation` code review passed, but the CodeQL scan reported `Analysis failed` twice without any security alerts. Local lint/build/test validation passed.
+
 ## Changes
 
 ### New files

@@ -134,6 +134,14 @@ describe("PUT /api/trips/:id", () => {
     expect(data.error).toBe("Invalid status");
   });
 
+  it("returns 400 for unknown fields", async () => {
+    mockGetAuthUserId.mockResolvedValue(1);
+    const res = await callPUT("1", { title: "Updated", unexpected: true });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("Unknown field: unexpected");
+  });
+
   it("returns 400 for invalid start_date format", async () => {
     mockGetAuthUserId.mockResolvedValue(1);
     const res = await callPUT("1", { start_date: "bad" });
@@ -146,8 +154,18 @@ describe("PUT /api/trips/:id", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when provided end_date is before the existing start_date", async () => {
+    mockGetAuthUserId.mockResolvedValue(1);
+    mockGetTrip.mockResolvedValue(sampleTrip);
+    const res = await callPUT("1", { end_date: "2026-06-30" });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("start_date must not be after end_date");
+  });
+
   it("returns 404 when trip not found", async () => {
     mockGetAuthUserId.mockResolvedValue(1);
+    mockGetTrip.mockResolvedValue(null);
     mockUpdateTrip.mockResolvedValue(null);
     const res = await callPUT("1", { title: "X" });
     expect(res.status).toBe(404);
@@ -155,6 +173,7 @@ describe("PUT /api/trips/:id", () => {
 
   it("returns 200 with updated trip", async () => {
     mockGetAuthUserId.mockResolvedValue(1);
+    mockGetTrip.mockResolvedValue(sampleTrip);
     const updated = { ...sampleTrip, title: "Updated" };
     mockUpdateTrip.mockResolvedValue(updated);
     const res = await callPUT("1", { title: "Updated" });
@@ -165,6 +184,7 @@ describe("PUT /api/trips/:id", () => {
 
   it("returns 500 on unexpected error", async () => {
     mockGetAuthUserId.mockResolvedValue(1);
+    mockGetTrip.mockRejectedValue(new Error("DB error"));
     mockUpdateTrip.mockRejectedValue(new Error("DB error"));
     const res = await callPUT("1", { title: "X" });
     expect(res.status).toBe(500);

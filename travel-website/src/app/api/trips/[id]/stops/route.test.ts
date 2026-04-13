@@ -15,6 +15,12 @@ vi.mock("@/lib/trip-service", () => ({
       this.name = "DestinationNotFoundError";
     }
   },
+  TripStopReorderError: class TripStopReorderError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "TripStopReorderError";
+    }
+  },
 }));
 
 const mockGetAuthUserId = vi.fn<() => Promise<number | null>>();
@@ -27,7 +33,12 @@ vi.mock("../../_helpers", () => ({
   },
 }));
 
-const { addTripStop, reorderTripStops, DestinationNotFoundError } =
+const {
+  addTripStop,
+  reorderTripStops,
+  DestinationNotFoundError,
+  TripStopReorderError,
+} =
   await import("@/lib/trip-service");
 const { POST, PUT } = await import("./route");
 
@@ -204,6 +215,19 @@ describe("PUT /api/trips/:id/stops", () => {
     expect(data.error).toBe("Duplicate sort_order in reorder payload");
   });
 
+  it("returns 400 when sort_orders are not contiguous", async () => {
+    mockGetAuthUserId.mockResolvedValue(1);
+    const res = await callPUT("1", {
+      stops: [
+        { id: 1, sort_order: 1 },
+        { id: 2, sort_order: 3 },
+      ],
+    });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toBe("sort_order values must be contiguous from 1 to 2");
+  });
+
   it("returns 400 when stop has non-integer id", async () => {
     mockGetAuthUserId.mockResolvedValue(1);
     const res = await callPUT("1", {
@@ -223,7 +247,9 @@ describe("PUT /api/trips/:id/stops", () => {
 
   it("returns 400 when stops do not belong to trip", async () => {
     mockGetAuthUserId.mockResolvedValue(1);
-    mockReorder.mockRejectedValue(new Error("Stop 999 does not belong to trip 1"));
+    mockReorder.mockRejectedValue(
+      new TripStopReorderError("Stop 999 does not belong to trip 1"),
+    );
     const res = await callPUT("1", {
       stops: [{ id: 999, sort_order: 1 }],
     });
@@ -233,7 +259,7 @@ describe("PUT /api/trips/:id/stops", () => {
   it("returns 400 for partial stop subsets", async () => {
     mockGetAuthUserId.mockResolvedValue(1);
     mockReorder.mockRejectedValue(
-      new Error("Reorder payload must include all stops for the trip"),
+      new TripStopReorderError("Reorder payload must include all stops for the trip"),
     );
     const res = await callPUT("1", {
       stops: [{ id: 1, sort_order: 1 }],

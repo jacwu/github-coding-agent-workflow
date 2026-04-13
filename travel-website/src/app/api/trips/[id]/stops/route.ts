@@ -4,6 +4,7 @@ import {
   addTripStop,
   reorderTripStops,
   DestinationNotFoundError,
+  TripStopReorderError,
 } from "@/lib/trip-service";
 
 import { getAuthenticatedUserId, parsePositiveInt } from "../../_helpers";
@@ -226,6 +227,17 @@ export async function PUT(
       sortOrders.add(sort_order);
     }
 
+    for (let expectedSortOrder = 1; expectedSortOrder <= stops.length; expectedSortOrder += 1) {
+      if (!sortOrders.has(expectedSortOrder)) {
+        return NextResponse.json(
+          {
+            error: `sort_order values must be contiguous from 1 to ${stops.length}`,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const result = await reorderTripStops(
       tripId,
       userId,
@@ -246,13 +258,7 @@ export async function PUT(
 
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof Error && error.message.includes("does not belong")) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 },
-      );
-    }
-    if (error instanceof Error && error.message.includes("must include all")) {
+    if (error instanceof TripStopReorderError) {
       return NextResponse.json(
         { error: error.message },
         { status: 400 },
