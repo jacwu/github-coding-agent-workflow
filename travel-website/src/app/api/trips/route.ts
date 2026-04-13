@@ -77,12 +77,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
-    if (
-      start_date && end_date &&
-      typeof start_date === "string" &&
-      typeof end_date === "string" &&
-      start_date > end_date
-    ) {
+    if (start_date && end_date && start_date > end_date) {
       return NextResponse.json(
         { error: "start_date must not be after end_date" },
         { status: 400 },

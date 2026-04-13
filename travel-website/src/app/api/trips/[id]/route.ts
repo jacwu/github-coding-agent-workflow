@@ -133,13 +133,7 @@ export async function PUT(
     const effectiveEnd =
       end_date !== undefined ? (end_date as string | null) : undefined;
 
-    if (
-      effectiveStart &&
-      effectiveEnd &&
-      typeof effectiveStart === "string" &&
-      typeof effectiveEnd === "string" &&
-      effectiveStart > effectiveEnd
-    ) {
+    if (effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
       return NextResponse.json(
         { error: "start_date must not be after end_date" },
         { status: 400 },

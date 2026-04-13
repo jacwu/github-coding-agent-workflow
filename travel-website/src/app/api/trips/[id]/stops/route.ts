@@ -81,13 +81,7 @@ export async function POST(
       }
     }
 
-    if (
-      arrival_date &&
-      departure_date &&
-      typeof arrival_date === "string" &&
-      typeof departure_date === "string" &&
-      arrival_date > departure_date
-    ) {
+    if (arrival_date && departure_date && arrival_date > departure_date) {
       return NextResponse.json(
         { error: "arrival_date must not be after departure_date" },
         { status: 400 },
