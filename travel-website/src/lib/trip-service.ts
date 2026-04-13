@@ -89,6 +89,13 @@ export class DestinationNotFoundError extends Error {
   }
 }
 
+export class TripStopReorderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TripStopReorderError";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -366,13 +373,17 @@ export async function reorderTripStops(
   // All provided stops must belong to this trip
   for (const s of input.stops) {
     if (!existingIds.has(s.id)) {
-      throw new Error(`Stop ${s.id} does not belong to trip ${tripId}`);
+      throw new TripStopReorderError(
+        `Stop ${s.id} does not belong to trip ${tripId}`,
+      );
     }
   }
 
   // Must include every current stop (no partial subsets)
   if (inputIds.size !== existingIds.size) {
-    throw new Error("Reorder payload must include all stops for the trip");
+    throw new TripStopReorderError(
+      "Reorder payload must include all stops for the trip",
+    );
   }
 
   for (let expectedSortOrder = 1; expectedSortOrder <= input.stops.length; expectedSortOrder += 1) {
@@ -380,7 +391,7 @@ export async function reorderTripStops(
       (stop) => stop.sort_order === expectedSortOrder,
     );
     if (!hasExpectedSortOrder) {
-      throw new Error(
+      throw new TripStopReorderError(
         `sort_order values must be contiguous from 1 to ${input.stops.length}`,
       );
     }

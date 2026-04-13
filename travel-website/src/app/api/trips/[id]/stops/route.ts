@@ -4,6 +4,7 @@ import {
   addTripStop,
   reorderTripStops,
   DestinationNotFoundError,
+  TripStopReorderError,
 } from "@/lib/trip-service";
 
 import { getAuthenticatedUserId, parsePositiveInt } from "../../_helpers";
@@ -257,19 +258,7 @@ export async function PUT(
 
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof Error && error.message.includes("does not belong")) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 },
-      );
-    }
-    if (error instanceof Error && error.message.includes("must include all")) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 },
-      );
-    }
-    if (error instanceof Error && error.message.includes("contiguous")) {
+    if (error instanceof TripStopReorderError) {
       return NextResponse.json(
         { error: error.message },
         { status: 400 },
