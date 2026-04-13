@@ -226,6 +226,17 @@ export async function PUT(
       sortOrders.add(sort_order);
     }
 
+    for (let expectedSortOrder = 1; expectedSortOrder <= stops.length; expectedSortOrder += 1) {
+      if (!sortOrders.has(expectedSortOrder)) {
+        return NextResponse.json(
+          {
+            error: `sort_order values must be contiguous from 1 to ${stops.length}`,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const result = await reorderTripStops(
       tripId,
       userId,
@@ -253,6 +264,12 @@ export async function PUT(
       );
     }
     if (error instanceof Error && error.message.includes("must include all")) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 },
+      );
+    }
+    if (error instanceof Error && error.message.includes("contiguous")) {
       return NextResponse.json(
         { error: error.message },
         { status: 400 },

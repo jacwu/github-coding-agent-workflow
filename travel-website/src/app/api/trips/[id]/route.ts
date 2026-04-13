@@ -10,6 +10,7 @@ import { getAuthenticatedUserId, parsePositiveInt } from "../_helpers";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_STATUSES = ["draft", "planned", "completed"] as const;
+const ALLOWED_UPDATE_FIELDS = new Set(["title", "start_date", "end_date", "status"]);
 
 export async function GET(
   _request: Request,
@@ -83,6 +84,16 @@ export async function PUT(
       );
     }
 
+    const unknownField = Object.keys(body).find(
+      (key) => !ALLOWED_UPDATE_FIELDS.has(key),
+    );
+    if (unknownField) {
+      return NextResponse.json(
+        { error: `Unknown field: ${unknownField}` },
+        { status: 400 },
+      );
+    }
+
     const { title, start_date, end_date, status } = body as Record<
       string,
       unknown
@@ -127,11 +138,36 @@ export async function PUT(
       }
     }
 
+    if (
+      start_date !== undefined &&
+      end_date !== undefined &&
+      start_date &&
+      end_date &&
+      start_date > end_date
+    ) {
+      return NextResponse.json(
+        { error: "start_date must not be after end_date" },
+        { status: 400 },
+      );
+    }
+
+    const existingTrip = await getTripByIdForUser(tripId, userId);
+    if (!existingTrip) {
+      return NextResponse.json(
+        { error: "Trip not found" },
+        { status: 404 },
+      );
+    }
+
     // Date consistency: resolve effective start/end
     const effectiveStart =
-      start_date !== undefined ? (start_date as string | null) : undefined;
+      start_date !== undefined
+        ? (start_date as string | null)
+        : existingTrip.start_date;
     const effectiveEnd =
-      end_date !== undefined ? (end_date as string | null) : undefined;
+      end_date !== undefined
+        ? (end_date as string | null)
+        : existingTrip.end_date;
 
     if (effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
       return NextResponse.json(

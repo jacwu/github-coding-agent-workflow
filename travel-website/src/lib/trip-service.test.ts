@@ -411,6 +411,26 @@ describe("trip-service", () => {
         ),
       ).rejects.toThrow(/must include all stops/);
     });
+
+    it("rejects non-contiguous sort orders", async () => {
+      seedTrip(testDb);
+      seedStops(testDb);
+
+      await expect(
+        reorderTripStops(
+          1,
+          1,
+          {
+            stops: [
+              { id: 1, sort_order: 1 },
+              { id: 2, sort_order: 3 },
+              { id: 3, sort_order: 4 },
+            ],
+          },
+          testDb,
+        ),
+      ).rejects.toThrow(/contiguous/);
+    });
   });
 
   describe("deleteTripStop", () => {

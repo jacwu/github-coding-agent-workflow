@@ -375,6 +375,17 @@ export async function reorderTripStops(
     throw new Error("Reorder payload must include all stops for the trip");
   }
 
+  for (let expectedSortOrder = 1; expectedSortOrder <= input.stops.length; expectedSortOrder += 1) {
+    const hasExpectedSortOrder = input.stops.some(
+      (stop) => stop.sort_order === expectedSortOrder,
+    );
+    if (!hasExpectedSortOrder) {
+      throw new Error(
+        `sort_order values must be contiguous from 1 to ${input.stops.length}`,
+      );
+    }
+  }
+
   // Apply new ordering
   for (const s of input.stops) {
     await database
