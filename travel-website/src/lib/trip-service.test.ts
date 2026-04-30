@@ -16,6 +16,7 @@ const {
   addTripStop,
   reorderTripStops,
   deleteTripStop,
+  updateTripStop,
   DestinationNotFoundError,
 } = await import("./trip-service");
 
@@ -462,6 +463,130 @@ describe("trip-service", () => {
 
       const result = await deleteTripStop(2, 1, 2, testDb);
       expect(result).toBeNull();
+    });
+  });
+
+  describe("updateTripStop", () => {
+    it("updates stop dates and notes successfully", async () => {
+      seedTrip(testDb);
+      seedStops(testDb);
+
+      const result = await updateTripStop(
+        1,
+        1,
+        1,
+        {
+          arrival_date: "2026-08-01",
+          departure_date: "2026-08-05",
+          notes: "Updated notes",
+        },
+        testDb,
+      );
+
+      expect(result).not.toBeNull();
+      const stop = result!.stops.find((s) => s.id === 1);
+      expect(stop).toBeDefined();
+      expect(stop!.arrival_date).toBe("2026-08-01");
+      expect(stop!.departure_date).toBe("2026-08-05");
+      expect(stop!.notes).toBe("Updated notes");
+    });
+
+    it("returns null for missing trip", async () => {
+      const result = await updateTripStop(999, 1, 1, { notes: "x" }, testDb);
+      expect(result).toBeNull();
+    });
+
+    it("returns null for unowned trip", async () => {
+      seedTrip(testDb);
+      seedStops(testDb);
+
+      const result = await updateTripStop(1, 1, 2, { notes: "x" }, testDb);
+      expect(result).toBeNull();
+    });
+
+    it("returns null for stop not belonging to trip", async () => {
+      seedTrip(testDb);
+      seedStops(testDb);
+
+      const result = await updateTripStop(1, 999, 1, { notes: "x" }, testDb);
+      expect(result).toBeNull();
+    });
+
+    it("preserves stop order while updating content", async () => {
+      seedTrip(testDb);
+      seedStops(testDb);
+
+      const result = await updateTripStop(
+        1,
+        2,
+        1,
+        { notes: "Changed only notes" },
+        testDb,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.stops).toHaveLength(3);
+      expect(result!.stops[0].sort_order).toBe(1);
+      expect(result!.stops[1].sort_order).toBe(2);
+      expect(result!.stops[1].id).toBe(2);
+      expect(result!.stops[1].notes).toBe("Changed only notes");
+      expect(result!.stops[2].sort_order).toBe(3);
+    });
+
+    it("handles partial updates (only dates)", async () => {
+      seedTrip(testDb);
+      seedStops(testDb);
+
+      const result = await updateTripStop(
+        1,
+        1,
+        1,
+        { arrival_date: "2026-09-01" },
+        testDb,
+      );
+
+      expect(result).not.toBeNull();
+      const stop = result!.stops.find((s) => s.id === 1);
+      expect(stop!.arrival_date).toBe("2026-09-01");
+      expect(stop!.departure_date).toBe("2026-07-05");
+      expect(stop!.notes).toBe("Visit temples");
+    });
+
+    it("handles partial updates (only notes)", async () => {
+      seedTrip(testDb);
+      seedStops(testDb);
+
+      const result = await updateTripStop(
+        1,
+        1,
+        1,
+        { notes: "New note" },
+        testDb,
+      );
+
+      expect(result).not.toBeNull();
+      const stop = result!.stops.find((s) => s.id === 1);
+      expect(stop!.arrival_date).toBe("2026-07-01");
+      expect(stop!.notes).toBe("New note");
+    });
+
+    it("can clear dates by setting to null", async () => {
+      seedTrip(testDb);
+      seedStops(testDb);
+
+      const result = await updateTripStop(
+        1,
+        1,
+        1,
+        { arrival_date: null, departure_date: null, notes: null },
+        testDb,
+      );
+
+      expect(result).not.toBeNull();
+      const stop = result!.stops.find((s) => s.id === 1);
+      expect(stop!.arrival_date).toBeNull();
+      expect(stop!.departure_date).toBeNull();
+      expect(stop!.notes).toBeNull();
     });
   });
 });

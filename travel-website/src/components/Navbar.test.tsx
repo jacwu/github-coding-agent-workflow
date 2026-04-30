@@ -78,6 +78,28 @@ describe("Navbar", () => {
     expect(screen.queryByText("Register")).toBeNull();
   });
 
+  it("renders My Trips link when authenticated", async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: "1", name: "Alice", email: "alice@example.com" },
+    });
+
+    const Component = await Navbar();
+    render(Component);
+
+    const myTripsLink = screen.getByText("My Trips");
+    expect(myTripsLink).toBeDefined();
+    expect(myTripsLink.getAttribute("href")).toBe("/trips");
+  });
+
+  it("does not render My Trips link when not authenticated", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const Component = await Navbar();
+    render(Component);
+
+    expect(screen.queryByText("My Trips")).toBeNull();
+  });
+
   it("shows email when name is null", async () => {
     mockAuth.mockResolvedValue({
       user: { id: "1", name: null, email: "anon@example.com" },
