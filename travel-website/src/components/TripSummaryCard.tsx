@@ -22,6 +22,7 @@ export default function TripSummaryCard({
   start_date,
   end_date,
   status,
+  created_at,
   updated_at,
 }: TripSummaryCardProps) {
   const statusClass = STATUS_STYLES[status] ?? "bg-gray-100 text-gray-800";
@@ -45,9 +46,10 @@ export default function TripSummaryCard({
         </p>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        Updated {updated_at}
-      </p>
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <p>Updated {updated_at}</p>
+        <p>Created {created_at}</p>
+      </div>
 
       <Link
         href={`/trips/${id}`}

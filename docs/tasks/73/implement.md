@@ -49,4 +49,29 @@ Implemented the complete trip planning UI: "My Trips" list page, trip detail/edi
 ## Test Count Delta
 
 - Before: 265 tests across 19 files
-- After: 313 tests across 22 files (+48 tests, +3 new test files)
+- After: 314 tests across 22 files (+49 tests, +3 new test files)
+
+## Revision Update — 2026-04-30
+
+### Review conclusion
+
+The trip pages and editing flow were already implemented and passing baseline validation, but the `/trips` summary cards still missed one design requirement: they showed `updated_at` but not `created_at`.
+
+### Targeted revisions
+
+| File | Revision |
+|---|---|
+| `travel-website/src/components/TripSummaryCard.tsx` | Added the missing created timestamp so each trip summary card now shows both updated and created metadata |
+| `travel-website/src/components/TripSummaryCard.test.tsx` | Added a focused regression test covering the created timestamp |
+
+### Validation
+
+| Command | Result |
+|---|---|
+| `npm run test -- src/components/TripSummaryCard.test.tsx` | Passed after the fix |
+| `npm run test -- src/components/TripCreateForm.test.tsx src/components/TripEditor.test.tsx src/components/Navbar.test.tsx` | Passed (27 tests) |
+| Manual verification | Confirmed the `/trips` page now renders a trip card with both “Updated …” and “Created …” metadata |
+
+### Remaining items
+
+- The provided screenshot URL is suitable to reference in the PR discussion for this UI refinement.

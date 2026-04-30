@@ -56,6 +56,11 @@ describe("TripSummaryCard", () => {
     expect(screen.getByText("Updated 2026-01-02 12:00:00")).toBeDefined();
   });
 
+  it("renders created timestamp", () => {
+    render(<TripSummaryCard {...defaultProps} />);
+    expect(screen.getByText("Created 2026-01-01 00:00:00")).toBeDefined();
+  });
+
   it("renders link to trip detail", () => {
     render(<TripSummaryCard {...defaultProps} />);
     const link = screen.getByText("Open trip");
