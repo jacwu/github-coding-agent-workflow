@@ -19,6 +19,12 @@ export default async function Navbar() {
         <div className="flex items-center gap-2">
           {session?.user ? (
             <>
+              <Link
+                href="/trips"
+                className="inline-flex items-center justify-center rounded-lg px-2.5 text-sm font-medium text-foreground hover:bg-muted h-7"
+              >
+                My Trips
+              </Link>
               <span className="text-sm text-foreground">
                 {session.user.name ?? session.user.email}
               </span>

@@ -42,6 +42,12 @@ export interface ReorderInput {
   stops: ReorderStopItem[];
 }
 
+export interface UpdateStopInput {
+  arrival_date?: string | null;
+  departure_date?: string | null;
+  notes?: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // DTO types
 // ---------------------------------------------------------------------------
@@ -448,6 +454,59 @@ export async function deleteTripStop(
       .update(tripStops)
       .set({ sortOrder: i + 1 })
       .where(eq(tripStops.id, remaining[i].id));
+  }
+
+  await touchUpdatedAt(tripId, database);
+
+  return fetchTripDetail(tripId, userId, database);
+}
+
+export async function updateTripStop(
+  tripId: number,
+  stopId: number,
+  userId: number,
+  input: UpdateStopInput,
+  database: Database = defaultDb,
+): Promise<TripDetailDto | null> {
+  // Verify trip ownership
+  const [tripRow] = await database
+    .select({ id: trips.id })
+    .from(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.userId, userId)))
+    .limit(1);
+
+  if (!tripRow) {
+    return null;
+  }
+
+  // Verify stop belongs to this trip
+  const [stopRow] = await database
+    .select({ id: tripStops.id })
+    .from(tripStops)
+    .where(and(eq(tripStops.id, stopId), eq(tripStops.tripId, tripId)))
+    .limit(1);
+
+  if (!stopRow) {
+    return null;
+  }
+
+  const updateFields: Record<string, unknown> = {};
+
+  if (input.arrival_date !== undefined) {
+    updateFields.arrivalDate = input.arrival_date;
+  }
+  if (input.departure_date !== undefined) {
+    updateFields.departureDate = input.departure_date;
+  }
+  if (input.notes !== undefined) {
+    updateFields.notes = input.notes;
+  }
+
+  if (Object.keys(updateFields).length > 0) {
+    await database
+      .update(tripStops)
+      .set(updateFields)
+      .where(eq(tripStops.id, stopId));
   }
 
   await touchUpdatedAt(tripId, database);
