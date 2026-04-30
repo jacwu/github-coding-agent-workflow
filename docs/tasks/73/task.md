@@ -36,14 +36,15 @@ Add the first end-to-end authenticated trip planning UI so that signed-in users 
 
 Verified against the current repository:
 
-- `travel-website/src/lib/trip-service.ts` and the `/api/trips` route tree already support trip CRUD, adding stops, reordering stops, and deleting stops for authenticated users.
-- `travel-website/src/app/api/trips/_helpers.ts` already provides the trip-route auth helper pattern for parsing `session.user.id` into a positive integer user id.
-- `travel-website/src/app/` currently has no `trips/` directory, so neither `/trips` nor `/trips/[id]` exists yet.
-- `travel-website/src/components/` currently contains auth, destination, and navbar UI, but there is no trip card, trip creation form, or trip editor component.
-- `travel-website/src/components/Navbar.tsx` shows login/register or session/logout state, but it does not yet expose a navigation link to the trip experience for signed-in users.
+- `travel-website/src/lib/trip-service.ts` and the `/api/trips` route tree already support trip CRUD, adding stops, reordering stops, and deleting stops for authenticated users. Exported DTOs include `TripSummaryDto` and `TripDetailDto` (with nested `TripStopDto[]` containing destination metadata). Error classes `DestinationNotFoundError` and `TripStopReorderError` are already defined.
+- `travel-website/src/app/api/trips/_helpers.ts` provides `getAuthenticatedUserId()` and `parsePositiveInt()`, which are used across all trip API routes for auth and param parsing.
+- `travel-website/src/app/` currently has no `trips/` directory, so neither `/trips` nor `/trips/[id]` page exists yet.
+- `travel-website/src/components/` currently contains `LoginForm`, `RegisterForm`, `DestinationCard`, `DestinationFilters`, `Navbar`, and shadcn/ui primitives (`button`, `card`, `input`, `label`). No trip-related components exist.
+- `travel-website/src/components/Navbar.tsx` shows login/register or session-name/logout state but exposes **no navigation links at all** (no Destinations, no About, no My Trips). Adding a "My Trips" link for authenticated users is the minimum scope of this issue; adding broader navigation links is out of scope.
+- Login and register pages live at `travel-website/src/app/login/page.tsx` and `travel-website/src/app/register/page.tsx` (not inside an `(auth)` route group, contrary to what `docs/design.md` section 3 shows). Auth utility functions `sanitizeCallbackUrl` and `buildAuthPageHref` are in `travel-website/src/lib/auth-utils.ts`.
 - The destination pages (`src/app/destinations/page.tsx` and `[id]/page.tsx`) establish the current visual and App Router patterns: server-rendered pages, client components only for interactive controls, light backgrounds, glass surfaces, and generous spacing.
-- `travel-website/src/lib/destination-service.ts` already exposes `listDestinations` and `getDestinationById`; the seeded data size in `docs/design.md` is 30 destinations, so a lightweight destination picker can be populated without adding search infrastructure.
-- The current backend does **not** expose a way to update an existing stop's `arrival_date`, `departure_date`, or `notes`; only add, reorder, and delete are available. Because the issue description explicitly calls for adjusting stop dates, the frontend work needs a tightly coupled minimal API extension for stop updates.
+- `travel-website/src/lib/destination-service.ts` exports `listDestinations(params)` returning `{ data: DestinationListItem[], total, page, limit }`. Each `DestinationListItem` includes `id`, `name`, `country`, `category`, `price_level`, `rating`, and `image`. The seeded data is 30 destinations, so a lightweight destination picker can be populated by calling `listDestinations({ limit: 100 })` and mapping the results.
+- The `[stopId]/route.ts` file **only exports `DELETE`**. There is no `PUT` handler for updating an existing stop's `arrival_date`, `departure_date`, or `notes`. The `trip-service.ts` file also has no `updateTripStop` function. Because the issue description explicitly calls for adjusting stop dates, both the service layer and the route handler need a tightly coupled minimal extension.
 
 ## Proposed Design
 
@@ -57,18 +58,19 @@ Add the missing authenticated pages under the App Router:
 | `travel-website/src/app/trips/[id]/page.tsx` | `/trips/:id` | Server-rendered trip detail shell with editing UI |
 | `travel-website/src/app/trips/loading.tsx` | `/trips` segment | Lightweight loading state for trip pages |
 | `travel-website/src/app/trips/[id]/not-found.tsx` | `/trips/:id` segment | Friendly missing-trip state for unknown/unowned trip ids |
+| `travel-website/src/app/trips/error.tsx` | `/trips` segment | Client-side error boundary for unexpected trip page errors |
 
-Additionally, update `travel-website/src/components/Navbar.tsx` so authenticated users can navigate to `/trips` via a visible "My Trips" link.
+Additionally, update `travel-website/src/components/Navbar.tsx` so authenticated users can navigate to `/trips` via a visible "My Trips" link. The link should appear in the navbar's right-hand section alongside the session user name and logout button.
 
 ### 2. Authentication and page access
 
 Both trip pages should be protected at the server-component boundary:
 
 - call `auth()` from `@/lib/auth`
-- if no session exists, redirect to `/login` with a sanitized `callbackUrl`
-- derive `userId` from `session.user.id`
+- if no session exists, redirect to `/login` with a sanitized `callbackUrl` using `buildAuthPageHref` from `@/lib/auth-utils`
+- derive `userId` by parsing `session.user.id` as a positive integer (matching the pattern in `_helpers.ts`)
 
-Implementation should reuse the existing auth utility style from `login/page.tsx`, `register/page.tsx`, and `src/lib/auth-utils.ts`.
+Implementation should reuse the existing auth utility style from `login/page.tsx` and `src/lib/auth-utils.ts`.
 
 Recommended behavior:
 
@@ -88,7 +90,7 @@ Concretely:
 
 - `/trips/page.tsx` should call `listTripsForUser(userId)` directly
 - `/trips/[id]/page.tsx` should call `getTripByIdForUser(tripId, userId)` directly
-- `/trips/[id]/page.tsx` should also load destination options for the add-stop form via `listDestinations({ limit: 100 })`
+- `/trips/[id]/page.tsx` should also load destination options for the add-stop form via `listDestinations({ limit: 100 })`, mapping results to `Array<{ id: number; name: string; country: string; category: string }>` for the picker
 - interactive create/update/reorder/delete actions should use `fetch()` against `/api/trips...` from client components
 
 This avoids calling the app's own API from server components while still reusing the existing route handlers for browser-side mutations.
@@ -181,9 +183,17 @@ To satisfy the issue requirement to adjust stop dates, extend the existing stop-
 | `PUT` | `/api/trips/:id/stops/:stopId` | Update one stop's dates and notes |
 | `DELETE` | `/api/trips/:id/stops/:stopId` | Keep existing delete behavior |
 
-Service-layer extension:
+Service-layer extension in `trip-service.ts`:
 
-- add `updateTripStop(tripId, stopId, userId, input, database?)`
+- add `UpdateStopInput` interface: `{ arrival_date?: string | null; departure_date?: string | null; notes?: string | null }`
+- add `updateTripStop(tripId, stopId, userId, input, database?)` function
+- the function should verify trip ownership, verify stop belongs to trip, apply updates, touch `updatedAt`, and return `TripDetailDto | null`
+
+Route-layer extension in `[stopId]/route.ts`:
+
+- add a `PUT` export alongside the existing `DELETE` export
+- reuse the `DATE_RE` pattern from the stops route for date validation
+- reuse `getAuthenticatedUserId` and `parsePositiveInt` from `_helpers.ts`
 
 Suggested request body:
 
@@ -238,34 +248,34 @@ Specific UX guidance:
 
 ### 9. Testing strategy
 
-Follow the repository's TDD and current Vitest patterns.
+Follow the repository's TDD and current Vitest patterns. Tests are co-located with source files and named `*.test.ts` / `*.test.tsx`.
 
-#### Backend additions
+#### Backend additions (written before implementation per TDD)
 
-If the stop-update API extension is implemented, add:
+Service tests in `travel-website/src/lib/trip-service.test.ts` (extend existing file):
 
-- `travel-website/src/lib/trip-service.test.ts`
-  - update existing stop dates/notes successfully
-  - return `null` for missing/unowned trip or stop
-  - preserve stop order while updating content
-- `travel-website/src/app/api/trips/[id]/stops/[stopId]/route.test.ts`
-  - `400` for malformed ids/body
-  - `401` unauthenticated
-  - `404` missing/unowned trip or stop
-  - `200` with updated trip detail
+- update existing stop dates/notes successfully
+- return `null` for missing/unowned trip or stop
+- preserve stop order while updating content
+- handle partial updates (only dates, only notes)
 
-#### Frontend component/page tests
+Route tests in `travel-website/src/app/api/trips/[id]/stops/[stopId]/route.test.ts` (extend existing file):
 
-Recommended new coverage:
+- `400` for malformed ids/body
+- `401` unauthenticated
+- `404` missing/unowned trip or stop
+- `200` with updated trip detail
+
+#### Frontend component/page tests (co-developed with components)
 
 | File | Coverage |
 |---|---|
 | `travel-website/src/components/TripCreateForm.test.tsx` | create flow, validation, redirect/navigation on success, inline error rendering |
 | `travel-website/src/components/TripSummaryCard.test.tsx` | renders title, status, dates, and detail link |
 | `travel-website/src/components/TripEditor.test.tsx` | trip update, add stop, reorder via up/down controls, stop update, stop delete, error states |
-| `travel-website/src/components/Navbar.test.tsx` | authenticated navbar shows "My Trips" link |
+| `travel-website/src/components/Navbar.test.tsx` | authenticated navbar shows "My Trips" link (extend existing file) |
 
-Server page behavior checks:
+Server page behavior (tested indirectly through component tests or verified manually):
 
 - unauthenticated `/trips` redirects to login with callback url
 - authenticated `/trips` renders trip summaries or empty state
@@ -273,10 +283,30 @@ Server page behavior checks:
 
 ## Implementation Plan
 
-1. Add the issue-specific backend support needed for stop-date editing: extend `trip-service.ts` plus `/api/trips/[id]/stops/[stopId]/route.ts` with `PUT`, writing tests first.
-2. Build the authenticated `/trips` page with direct server-side data loading, empty state, `TripCreateForm`, and `TripSummaryCard`.
-3. Update the navbar so signed-in users can reach the trip experience from anywhere in the app.
-4. Build the authenticated `/trips/[id]` page and `TripEditor` client component, passing in trip detail plus destination options loaded on the server.
-5. Implement trip-level editing, add-stop, reorder, stop-date update, and stop-delete interactions using the existing trip APIs plus the new stop-update endpoint.
-6. Add focused component/page tests for the trip UI and targeted backend tests for the stop-update path.
-7. Validate the full flow manually: login → open `/trips` → create trip → open detail → add stop → reorder stop(s) → update dates/notes → delete stop.
+1. **Backend: stop-update service + route (TDD)**
+   - Write service-layer tests for `updateTripStop` in `trip-service.test.ts` (update dates/notes successfully, return `null` for missing/unowned trip or stop, preserve sort order).
+   - Implement `UpdateStopInput` interface and `updateTripStop` function in `trip-service.ts`.
+   - Write route-handler tests for `PUT /api/trips/:id/stops/:stopId` in `[stopId]/route.test.ts` (400/401/404/200 cases).
+   - Add the `PUT` export to `[stopId]/route.ts`.
+   - Run `npm run test` and `npm run lint` to confirm all backend tests pass.
+
+2. **Trips list page + components**
+   - Create `travel-website/src/app/trips/page.tsx` with server-side auth check and direct `listTripsForUser` call.
+   - Create `travel-website/src/app/trips/loading.tsx` and `travel-website/src/app/trips/error.tsx`.
+   - Create `TripCreateForm.tsx` client component (POST to `/api/trips`, navigate to detail on success).
+   - Create `TripSummaryCard.tsx` presentational component.
+   - Write component tests: `TripCreateForm.test.tsx`, `TripSummaryCard.test.tsx`.
+
+3. **Navbar update**
+   - Add "My Trips" link to `Navbar.tsx` for authenticated users.
+   - Update `Navbar.test.tsx` to verify the link appears only when authenticated.
+
+4. **Trip detail page + editor**
+   - Create `travel-website/src/app/trips/[id]/page.tsx` with server-side auth and `getTripByIdForUser` + `listDestinations`.
+   - Create `travel-website/src/app/trips/[id]/not-found.tsx`.
+   - Create `TripEditor.tsx` client component handling all trip/stop mutations.
+   - Write `TripEditor.test.tsx` covering: trip update, add stop, reorder via up/down, stop update, stop delete, error states.
+
+5. **Integration verification**
+   - Run full `npm run test`, `npm run lint`, and `AUTH_SECRET=test-secret npm run build`.
+   - Manually verify the end-to-end flow: login → `/trips` → create trip → `/trips/[id]` → add stop → reorder → update dates/notes → delete stop.
