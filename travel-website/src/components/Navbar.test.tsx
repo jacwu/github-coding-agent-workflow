@@ -64,6 +64,17 @@ describe("Navbar", () => {
     expect(screen.getByText("Travel Website")).toBeDefined();
   });
 
+  it("renders About link when no session", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const Component = await Navbar();
+    render(Component);
+
+    const aboutLink = screen.getByText("About");
+    expect(aboutLink).toBeDefined();
+    expect(aboutLink.getAttribute("href")).toBe("/about");
+  });
+
   it("renders user name and Logout when session exists", async () => {
     mockAuth.mockResolvedValue({
       user: { id: "1", name: "Alice", email: "alice@example.com" },
@@ -76,6 +87,19 @@ describe("Navbar", () => {
     expect(screen.getByText("Logout")).toBeDefined();
     expect(screen.queryByText("Login")).toBeNull();
     expect(screen.queryByText("Register")).toBeNull();
+  });
+
+  it("renders About link when session exists", async () => {
+    mockAuth.mockResolvedValue({
+      user: { id: "1", name: "Alice", email: "alice@example.com" },
+    });
+
+    const Component = await Navbar();
+    render(Component);
+
+    const aboutLink = screen.getByText("About");
+    expect(aboutLink).toBeDefined();
+    expect(aboutLink.getAttribute("href")).toBe("/about");
   });
 
   it("shows email when name is null", async () => {
