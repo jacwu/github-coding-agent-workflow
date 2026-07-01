@@ -4,16 +4,17 @@
 
 Task 1 in `docs/tasks.md` defines the initial frontend foundation for the travel website. Repository-level requirements establish a full-stack travel product built with Next.js, TypeScript, Tailwind CSS, and shadcn/ui, while `docs/design.md` further requires a "Light & Airy Vacation Style" centered on Ocean Teal, light neutral backgrounds, large radii, and soft shadows.
 
-The current repository state shows that `travel-website/` exists but does not yet contain an initialized Next.js application structure, so this task must define the baseline scaffold and global styling conventions that later issues will build on.
+The current repository state shows that `travel-website/` exists (containing only `AGENTS.md`) but does not yet contain an initialized Next.js application structure, so this task must define the baseline scaffold and global styling conventions that later issues will build on.
 
 ## Goal
 
-Create the technical design for bootstrapping the application in `travel-website/` with:
+Bootstrap the application in `travel-website/` with:
 
 - Next.js 15 App Router
 - TypeScript in strict mode
-- Tailwind CSS
+- Tailwind CSS v4
 - shadcn/ui integration
+- Vitest for unit testing
 - Global design tokens and base styles implementing the Light & Airy Vacation visual system
 
 ## Non-Goals
@@ -22,101 +23,166 @@ Create the technical design for bootstrapping the application in `travel-website
 - Building destination- or trip-specific UI components beyond what is needed to prove the shared style foundation
 - Defining final page content for later tasks
 - Establishing per-feature data fetching or state management patterns beyond baseline project setup
+- Installing database, ORM, or authentication packages (deferred to later tasks)
 
 ## Current State
 
 - Repository-level planning documents exist in `docs/`.
-- `travel-website/` exists as the intended application root.
+- `travel-website/` exists as the intended application root and contains only `AGENTS.md`.
 - The expected application scaffold from `docs/design.md` has not yet been generated.
-- There is no confirmed Tailwind, Next.js, TypeScript, or shadcn/ui configuration in the app directory yet.
+- There is no Tailwind, Next.js, TypeScript, or shadcn/ui configuration in the app directory.
 
 ## Proposed Design
 
 ### 1. Application bootstrap
 
-Initialize `travel-website/` as a Next.js 15 application using the App Router and npm-managed dependencies. The scaffold should include:
+Use `npx create-next-app@latest` (non-interactively) to initialize `travel-website/` as a Next.js 15 application with the App Router. The flags/options used should select:
 
-- TypeScript
+- TypeScript (strict mode enabled in `tsconfig.json`)
 - `src/` directory layout
 - Tailwind CSS
-- ESLint defaults from the Next.js scaffold
-- Import alias support for `@/*`
+- ESLint with Next.js defaults
+- Import alias `@/*` pointing to `./src/*`
+- App Router (not Pages Router)
 
-The generated project should preserve the repository’s intended structure from `docs/design.md`, especially `src/app`, `src/components`, `src/lib`, and future `src/db` locations.
+Since `travel-website/` already contains `AGENTS.md`, the scaffold should be generated in a temporary location and then merged, or use `--yes` flags that overwrite only non-conflicting files, preserving `AGENTS.md`.
+
+The generated project must preserve the directory structure from `docs/design.md`: `src/app`, `src/components`, `src/lib`, and placeholder locations for `src/db` and `src/types`.
 
 ### 2. Baseline app structure
 
-The initial scaffold should establish only the shared files needed for future work:
+After scaffolding, the following files must exist:
 
-- `src/app/layout.tsx`
-- `src/app/page.tsx`
-- global stylesheet (`src/app/globals.css`)
-- Tailwind/PostCSS/TypeScript/Next.js config files produced by the scaffold
-- shared utility support required by shadcn/ui (for example `src/lib/utils.ts`)
-- `components.json` and the initial shadcn/ui support structure
+| File | Purpose |
+|------|---------|
+| `src/app/layout.tsx` | Root layout with font loading and global styles |
+| `src/app/page.tsx` | Minimal placeholder page consuming shared tokens |
+| `src/app/globals.css` | Tailwind directives and CSS variable definitions |
+| `src/lib/utils.ts` | `cn()` utility required by shadcn/ui |
+| `components.json` | shadcn/ui project configuration |
+| `tailwind.config.ts` | Tailwind theme extensions (if Tailwind v3) or handled in `globals.css` (if Tailwind v4) |
+| `postcss.config.mjs` | PostCSS configuration |
+| `tsconfig.json` | TypeScript strict config with path aliases |
+| `next.config.ts` | Next.js configuration |
+| `package.json` | Project dependencies and scripts |
 
-The root page can remain a minimal placeholder, but it should already consume the shared styling foundation so subsequent tasks inherit the correct visual defaults.
+The root page should render a minimal element that visually demonstrates the Ocean Teal primary color and large border radius to confirm the style system works.
 
 ### 3. shadcn/ui integration
 
-Integrate shadcn/ui immediately after scaffolding so later tasks can add UI primitives without reworking project setup. The configuration should:
+Run `npx shadcn@latest init` (non-interactively) after the Next.js scaffold is ready. Configuration choices:
 
-- point generated components to `src/components/ui`
-- use the project’s Tailwind and CSS variable theme setup
-- align with the `@/*` alias
-- support class composition utilities expected by shadcn/ui
+- **Style**: New York (cleaner, more modern look)
+- **Base color**: Slate (aligns with light gray/slate backgrounds from design.md)
+- **CSS variables**: Yes (required for centralized theming)
+- **Components path**: `src/components/ui`
+- **Utils path**: `src/lib/utils.ts`
+- **Import alias**: `@/*`
 
-No large batch of UI components is required in this task; only the minimum integration needed to support future additions.
+This produces `components.json` and installs the `clsx` + `tailwind-merge` dependencies (via the `cn()` utility). No UI components need to be added in this task; the integration is complete once `shadcn` can generate components on demand.
 
 ### 4. Global style token system
 
-Define the global design tokens in CSS variables so the visual system is centralized and reusable across Tailwind utilities and shadcn/ui components.
+Define the global design tokens as CSS custom properties in `src/app/globals.css`. These tokens follow shadcn/ui's HSL-based convention for seamless component integration.
 
-Required styling direction:
+**Ocean Teal primary color** (approximate HSL values, may be fine-tuned during implementation):
 
-- **Primary color**: Ocean Teal as the only primary/action color
-- **Backgrounds**: white and very light gray/slate surfaces
-- **Radii**: default toward large rounded surfaces, especially `rounded-2xl` and `rounded-3xl`
-- **Shadows**: soft elevation rather than strong borders
-- **Typography**: default modern sans-serif from the Next.js font stack
+```
+--primary: 181 55% 35%;          /* Ocean Teal - buttons, links, key actions */
+--primary-foreground: 0 0% 100%; /* White text on primary */
+```
 
-Recommended token groups:
+**Full token set** (light mode only for this task):
 
-- semantic background/foreground colors
-- primary/primary-foreground
-- muted/card/popover/surface colors
-- border/input/ring colors derived from the same airy palette
-- radius token(s) sized so shared components naturally feel soft and spacious
+| Token | Value (HSL) | Intent |
+|-------|-------------|--------|
+| `--background` | `0 0% 100%` | Page background (white) |
+| `--foreground` | `222 47% 11%` | Primary text color (dark navy) |
+| `--card` | `210 40% 98%` | Card surfaces (very light gray) |
+| `--card-foreground` | `222 47% 11%` | Card text |
+| `--popover` | `0 0% 100%` | Popover backgrounds |
+| `--popover-foreground` | `222 47% 11%` | Popover text |
+| `--primary` | `181 55% 35%` | Ocean Teal |
+| `--primary-foreground` | `0 0% 100%` | White on primary |
+| `--secondary` | `40 30% 96%` | Sandy beige (subtle) |
+| `--secondary-foreground` | `222 47% 11%` | Text on secondary |
+| `--muted` | `210 40% 96%` | Muted surfaces (slate-50) |
+| `--muted-foreground` | `215 16% 47%` | De-emphasized text |
+| `--accent` | `181 55% 95%` | Light teal tint for hover states |
+| `--accent-foreground` | `181 55% 25%` | Text on accent |
+| `--destructive` | `0 84% 60%` | Error/destructive actions |
+| `--destructive-foreground` | `0 0% 100%` | White on destructive |
+| `--border` | `214 20% 92%` | Subtle borders |
+| `--input` | `214 20% 92%` | Input borders |
+| `--ring` | `181 55% 35%` | Focus rings (teal) |
+| `--radius` | `1rem` | Base radius token (large, aligns with rounded-2xl feel) |
 
 ### 5. Tailwind theme alignment
 
-Tailwind configuration should be set up so the visual language is easy to apply consistently:
+Tailwind configuration should extend the theme to expose CSS-variable-backed tokens. With Tailwind v4 (used by the latest `create-next-app`), theme customization is handled directly in `globals.css` via `@theme` blocks rather than `tailwind.config.ts`.
 
-- expose CSS-variable-backed color tokens
-- prefer large radius tokens in reusable component styling
-- define shadow values that match the soft floating aesthetic
-- keep the theme minimal and centered on the repository design doc instead of introducing extra brand colors
+Key alignment points:
 
-Where possible, use shadcn/ui’s CSS-variable-based theming model so custom components and generated primitives share the same tokens.
+- Colors reference CSS variables: `hsl(var(--primary))`, etc.
+- Border radius uses the `--radius` variable as the base
+- The default `shadow-sm` / `shadow-md` / `shadow-xl` Tailwind utilities are sufficient for the soft floating effect described in `design.md`; no custom shadow definitions are required unless defaults prove insufficient
+- No additional brand colors beyond the defined token set
 
 ### 6. Base layout styling
 
-The global layout should establish the visual baseline for all future pages:
+`src/app/layout.tsx` should:
 
-- light page background
-- readable foreground color
-- smooth font rendering
-- generous default spacing behavior
-- optional centered content container conventions for later pages
+- Import and apply the project font (Geist Sans from `next/font/google` or the local font included by `create-next-app`)
+- Apply `antialiased` for smooth font rendering
+- Set the `<html>` and `<body>` classes to use the `--background` and `--foreground` tokens
+- Not include a navigation bar or header (those are later tasks)
 
-This task does not need to finalize every layout primitive, but it should ensure new pages start from the correct visual foundation without repeated setup.
+### 7. Testing infrastructure
+
+Per `docs/design.md` Section 8, the project uses Vitest for unit testing. This task should:
+
+- Install `vitest` and `@testing-library/react` as dev dependencies
+- Add a `vitest.config.ts` with path alias support matching `tsconfig.json`
+- Add a `test` script in `package.json`: `"test": "vitest run"`
+- Include one minimal smoke test (e.g., verifying `cn()` utility works correctly) to prove the test infrastructure is operational
+
+### 8. Scripts and validation
+
+The following npm scripts must be functional after this task:
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| `dev` | `next dev` | Local development server |
+| `build` | `next build` | Production build |
+| `start` | `next start` | Production server |
+| `lint` | `next lint` | ESLint checks |
+| `test` | `vitest run` | Run unit tests |
+
+Validation criteria:
+- `npm run lint` passes with no errors
+- `npm run build` completes successfully
+- `npm test` passes (smoke test)
 
 ## Implementation Plan
 
-1. Scaffold a new Next.js 15 app inside `travel-website/` using npm, TypeScript, Tailwind CSS, App Router, and `src/` directory support.
-2. Preserve existing repository files in `travel-website/` while adding the generated project files.
-3. Initialize shadcn/ui with CSS-variable theming and project aliases aligned to the scaffold.
-4. Define global CSS variables for the Light & Airy Vacation palette, including Ocean Teal primary, light surfaces, large radii, and soft shadows.
-5. Connect the global tokens to Tailwind/shadcn/ui so future components inherit the same visual rules.
-6. Add a minimal root layout/page that proves the app boots successfully and uses the shared style baseline.
-7. Validate that the resulting scaffold supports subsequent tasks without requiring theme or structure rework.
+1. **Scaffold Next.js app**: Run `npx create-next-app@latest` with appropriate flags to generate the project in a temporary directory, then merge into `travel-website/` preserving `AGENTS.md`.
+2. **Verify baseline**: Confirm `npm run build` and `npm run lint` pass with the default scaffold.
+3. **Initialize shadcn/ui**: Run `npx shadcn@latest init` with the configuration specified above, generating `components.json` and `src/lib/utils.ts`.
+4. **Customize global CSS variables**: Replace the default shadcn/ui theme tokens in `src/app/globals.css` with the Ocean Teal palette defined in Section 4.
+5. **Align Tailwind theme**: Ensure Tailwind configuration (either `tailwind.config.ts` or `@theme` in CSS) references the custom tokens correctly.
+6. **Style root layout and page**: Update `src/app/layout.tsx` and `src/app/page.tsx` to demonstrate the visual baseline (light background, Ocean Teal accent, large radius).
+7. **Set up Vitest**: Install testing dependencies, create `vitest.config.ts`, add `test` script, and write a minimal smoke test for the `cn()` utility.
+8. **Final validation**: Run `npm run lint`, `npm run build`, and `npm test` to confirm everything passes.
+
+## Dependencies
+
+This task has no upstream dependencies. It is the foundational task that all subsequent issues depend on.
+
+## Risks & Mitigations
+
+| Risk | Mitigation |
+|------|-----------|
+| `create-next-app` overwrites `AGENTS.md` | Scaffold in a temp directory and merge carefully |
+| Tailwind v4 CSS-based config differs from v3 examples | Follow the official shadcn/ui Tailwind v4 setup guide |
+| shadcn/ui version incompatibility with Next.js 15 | Use latest shadcn CLI which supports Next.js 15 |
+| HSL values for Ocean Teal may not look right | Fine-tune during implementation; the exact values in this doc are starting points |
