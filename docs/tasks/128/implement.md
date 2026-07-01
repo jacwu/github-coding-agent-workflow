@@ -23,7 +23,7 @@
 ## Changes Made
 
 ### Application Bootstrap
-- Scaffolded Next.js 15 with App Router, TypeScript (strict mode), Tailwind CSS v4, and ESLint in `travel-website/`
+- Scaffolded Next.js 15.5.19 with App Router, TypeScript (strict mode), Tailwind CSS v4, and ESLint in `travel-website/`
 - Preserved existing `AGENTS.md` file during scaffold merge
 - Configured `@/*` import alias pointing to `./src/*`
 
