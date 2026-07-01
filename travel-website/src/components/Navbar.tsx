@@ -9,12 +9,20 @@ export default async function Navbar() {
   return (
     <nav className="glass sticky top-0 z-50">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-        <Link
-          href="/"
-          className="text-lg font-bold tracking-tight text-primary"
-        >
-          Travel Website
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/"
+            className="text-lg font-bold tracking-tight text-primary"
+          >
+            Travel Website
+          </Link>
+          <Link
+            href="/about"
+            className="inline-flex items-center justify-center rounded-lg px-2.5 text-sm font-medium text-foreground hover:bg-muted h-7"
+          >
+            About
+          </Link>
+        </div>
 
         <div className="flex items-center gap-2">
           {session?.user ? (
