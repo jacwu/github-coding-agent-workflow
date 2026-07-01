@@ -25,5 +25,5 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 | `dev` | `next dev` | Local development server |
 | `build` | `next build` | Production build |
 | `start` | `next start` | Production server |
-| `lint` | `eslint` | ESLint checks |
+| `lint` | `next lint` | ESLint checks |
 | `test` | `vitest run` | Run unit tests |

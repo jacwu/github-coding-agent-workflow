@@ -1,9 +1,29 @@
 # Issue 128 — Implementation Summary
 
+## Implementation Revision — 2026-07-01
+
+### Revisions Made
+- Aligned the scaffold dependencies with the task design by pinning `next` and `eslint-config-next` to `15.5.19`
+- Replaced the Next 16-style flat ESLint setup with a Next 15-compatible `.eslintrc.json` and restored the `next lint` script expected by the task document
+- Regenerated `package-lock.json` so a fresh clone can install dependencies successfully with npm
+- Added a `postcss` override to resolve the transitive audit finding reported through Next.js while keeping the task on Next 15
+- Applied `bg-background` and `text-foreground` directly on the root `<body>` to match the global token usage described in `task.md`
+
+### Validation Results
+| Command | Result |
+|---------|--------|
+| `npm run lint` | ✅ Passed |
+| `npm run build` | ✅ Passed |
+| `npm test` | ✅ Passed |
+| `npm audit --omit=dev` | ✅ Passed (0 vulnerabilities) |
+
+### Remaining Items
+- None
+
 ## Changes Made
 
 ### Application Bootstrap
-- Scaffolded Next.js 15 (v16.2.9) with App Router, TypeScript (strict mode), Tailwind CSS v4, and ESLint in `travel-website/`
+- Scaffolded Next.js 15 with App Router, TypeScript (strict mode), Tailwind CSS v4, and ESLint in `travel-website/`
 - Preserved existing `AGENTS.md` file during scaffold merge
 - Configured `@/*` import alias pointing to `./src/*`
 
@@ -40,7 +60,8 @@
 | `travel-website/tsconfig.json` | Created (strict mode, path aliases) |
 | `travel-website/next.config.ts` | Created |
 | `travel-website/postcss.config.mjs` | Created |
-| `travel-website/eslint.config.mjs` | Created |
+| `travel-website/.eslintrc.json` | Created |
+| `travel-website/eslint.config.mjs` | Deleted during revision (replaced with Next 15-compatible config) |
 | `travel-website/vitest.config.ts` | Created |
 | `travel-website/components.json` | Created (shadcn/ui config) |
 | `travel-website/.gitignore` | Created |
