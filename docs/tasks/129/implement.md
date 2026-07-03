@@ -52,3 +52,32 @@
 ## Open Items
 
 None — all acceptance criteria from the task document are satisfied.
+
+## Revision Update
+
+### Review Conclusion
+- The original implementation broadly matched the task design, but the default SQLite path was still derived from `process.cwd()`.
+- That made the fallback database location depend on the caller's working directory instead of consistently resolving to `travel-website/data/app.db`.
+
+### Targeted Revisions
+- Added `travel-website/src/db/config.ts` to centralize database path resolution without opening a database connection as a side effect.
+- Updated `travel-website/src/db/index.ts` to reuse the shared resolver and continue exporting `resolveDatabasePath()` for callers and tests.
+- Updated `travel-website/drizzle.config.ts` to reuse the same resolver so runtime code and migration tooling stay aligned.
+- Strengthened `travel-website/src/db/index.test.ts` to verify:
+  - the default path stays anchored to the app root even if `cwd` changes,
+  - relative `DATABASE_URL` values resolve from the app root,
+  - the exported Drizzle client executes a basic query directly.
+
+### Revision Validation
+
+| Command | Result |
+|---|---|
+| `cd travel-website && npx vitest run src/db/index.test.ts` | ✔ 5 database tests passed |
+| `cd travel-website && npm run lint` | ✔ No warnings or errors |
+| `cd travel-website && npm test` | ✔ 9 tests passed |
+| `cd travel-website && npm run build` | ✔ Compiled successfully |
+| `cd travel-website && npm run db:generate` | ✔ No schema changes, nothing to migrate |
+
+### Remaining Items
+
+None.
