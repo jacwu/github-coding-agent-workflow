@@ -3,20 +3,9 @@ import { mkdirSync } from "node:fs";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 
+import { resolveDatabasePath } from "./config";
 import * as schema from "./schema";
-
-/**
- * Resolves the SQLite database file path.
- * Uses DATABASE_URL environment variable if set, otherwise defaults to ./data/app.db
- * relative to the project root (travel-website/).
- */
-export function resolveDatabasePath(): string {
-  const envUrl = process.env.DATABASE_URL;
-  if (envUrl) {
-    return path.resolve(envUrl);
-  }
-  return path.resolve(process.cwd(), "data", "app.db");
-}
+export { resolveDatabasePath } from "./config";
 
 /**
  * Creates a better-sqlite3 connection, ensuring the parent directory exists.
